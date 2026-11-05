@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>L'imaginarium du Docteur Noirpeste</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Alegreya:ital,wght@0,500;0,700;1,500&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Cinzel:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* Plan : la charte de la bannière officielle. Noir chaud, filets et ornements bronze, texte crème.
+   Gothique (Pirata One) pour les grands titres comme « Docteur Noirpeste », serif Alegreya pour les titres courants,
+   Cinzel espacé pour les étiquettes comme « SALLE DE JEUX DE RÔLE », Alegreya Sans pour lire. Thème sombre unique. */
+:root{
+  --ink:#0b0a08; --panel:#15120e; --panel-2:#1d1913; --line:#33291c;
+  --bone:#ede5d3; --muted:#a89c86; --brass:#c8924a; --brass-deep:#7d5a2c; --on-brass:#1a1006;
+  --ok:#8fb27a; --warn:#e07f45; --bad:#d06a5a; --info:#93b2c4;
+  --f-display:"Pirata One", "UnifrakturCook", Georgia, serif;
+  --f-fell:"Alegreya", Georgia, serif;
+  --f-body:"Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  --f-label:"Cinzel", "Alegreya Sans", Georgia, serif;
+  --r:6px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--ink);color:var(--bone);font-family:var(--f-body);font-size:17px;line-height:1.5;
+  background-image:radial-gradient(ellipse at 50% 0%, #1a150e 0%, transparent 55%);background-attachment:fixed;min-height:100vh}
+h1,h2,h3{font-weight:400;text-wrap:balance;margin:0}
+h2{font-family:var(--f-display);font-size:2.3rem;line-height:1.05;letter-spacing:.01em}
+h3{font-family:var(--f-fell);font-weight:700;font-size:1.28rem;line-height:1.2}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.orn{display:flex;align-items:center;gap:10px;color:var(--brass)}
+.orn::before,.orn::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--brass-deep))}
+.orn::after{background:linear-gradient(90deg,var(--brass-deep),transparent)}
+.orn i{width:7px;height:7px;border-radius:50%;background:var(--brass);display:block}
+p{margin:0}
+a{color:var(--brass)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.label{font-family:var(--f-label);font-weight:500;letter-spacing:.14em;text-transform:uppercase;font-size:.72rem;color:var(--muted)}
+.muted{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+
+/* Bandeau démo */
+.demo{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:center;padding:7px 16px;background:#22180c;color:#e7d3ad;font-size:.88rem;border-bottom:1px solid #4a3520}
+.demo .seg{display:inline-flex;border:1px solid #6b5627;border-radius:999px;overflow:hidden}
+.demo .seg button{background:none;border:0;padding:3px 12px;cursor:pointer;color:#e7d6a8}
+.demo .seg button[aria-pressed="true"]{background:var(--brass);color:var(--on-brass);font-weight:700}
+.demo .link{background:none;border:0;color:#e7d6a8;text-decoration:underline;cursor:pointer;padding:0}
+
+/* En-tête */
+header.top{position:sticky;top:0;z-index:20;background:rgba(11,10,8,.94);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+.top .in{max-width:1120px;margin:0 auto;display:flex;align-items:center;gap:20px;padding:10px 16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--bone);margin-right:auto}
+.brand img{width:46px;height:46px;display:block}
+.brand span{font-family:var(--f-fell);font-weight:500;font-size:.95rem;line-height:1;color:var(--muted)}
+.brand b{display:block;font-family:var(--f-display);font-weight:400;font-size:1.45rem;color:var(--bone);line-height:1.05}
+nav.main{display:flex;gap:4px;flex-wrap:wrap}
+nav.main a{text-decoration:none;color:var(--bone);padding:6px 12px;border-radius:999px;font-family:var(--f-label);font-weight:500;letter-spacing:.1em;font-size:.82rem;text-transform:uppercase}
+nav.main a:hover{background:var(--panel-2)}
+nav.main a[aria-current="page"]{background:var(--panel-2);color:var(--brass)}
+nav.main a.mj{border:1px solid var(--brass-deep);color:var(--brass)}
+
+main{max-width:1120px;margin:0 auto;padding:28px 16px 80px;display:grid;gap:40px}
+.sec-head{display:flex;align-items:end;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid transparent;border-image:linear-gradient(90deg,var(--brass-deep),var(--line) 40%,transparent) 1}
+
+/* Boutons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:var(--r);padding:9px 16px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer;text-decoration:none;color:var(--bone);font-weight:500;line-height:1.2}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--brass);border-color:var(--brass);color:var(--on-brass);font-weight:700}
+.btn.primary:hover{background:#d8b25a}
+.btn.ghost{background:none}
+.btn.small{padding:5px 10px;font-size:.88rem}
+.btn.danger{color:var(--bad);border-color:#5a2f29;background:none}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* Pastilles */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:2px 10px;border-radius:999px;font-family:var(--f-label);font-weight:500;font-size:.8rem;letter-spacing:.04em;border:1px solid currentColor;white-space:nowrap}
+.pill.ok{color:var(--ok)} .pill.warn{color:var(--warn)} .pill.bad{color:var(--bad)} .pill.info{color:var(--info)} .pill.brass{color:var(--brass)} .pill.mute{color:var(--muted)}
+.pill.fill-ok{background:var(--ok);color:#13200f;border-color:var(--ok)}
+
+/* Accueil */
+.hero{display:grid;gap:22px;justify-items:center;text-align:center;padding-top:4px}
+.hero .banner{width:100%;height:auto;display:block;border-radius:2px;aspect-ratio:1600/643;background:#0b0a08}
+.hero p.lead{font-size:1.15rem;max-width:36em;color:#dcd3bf}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);box-shadow:inset 0 0 0 4px var(--panel),inset 0 0 0 5px #241d13;border-radius:var(--r);padding:18px;display:grid;gap:8px;align-content:start}
+.steps{counter-reset:s;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.steps .card h3::before{counter-increment:s;content:counter(s, upper-roman) ". ";color:var(--brass);font-family:var(--f-label)}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.menu-list{display:grid;gap:2px}
+.menu-list .it{display:flex;gap:12px;align-items:baseline;padding:8px 0;border-bottom:1px dotted var(--line)}
+.menu-list .it .n{font-weight:500}
+.menu-list .it .d{color:var(--muted);font-size:.92rem}
+.menu-list .it .p{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--brass);white-space:nowrap}
+.note{font-size:.88rem;color:var(--muted);font-style:italic}
+.menu-cols{grid-template-columns:1fr 1fr;column-gap:40px}
+.contact{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.contact-card{grid-template-columns:auto 1fr;align-items:center;gap:16px;text-decoration:none;color:var(--bone)}
+.contact-card:hover{border-color:var(--brass-deep)}
+.contact-card svg{width:34px;height:34px;color:var(--brass)}
+.contact-card b{display:block;font-family:var(--f-fell);font-weight:700;font-size:1.15rem;overflow-wrap:anywhere}
+
+/* Planning */
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:none;border-radius:999px;padding:4px 12px;cursor:pointer;font-family:var(--f-label);font-weight:500;letter-spacing:.04em;font-size:.88rem;color:var(--muted)}
+.chip[aria-pressed="true"]{border-color:var(--brass);color:var(--brass);background:#231e12}
+.week{display:grid;gap:8px}
+.week > .label{margin-top:8px}
+.sess{display:grid;grid-template-columns:76px 1fr auto;gap:16px;align-items:center;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:var(--r);padding:12px 16px;cursor:pointer;text-align:left;width:100%}
+.sess:hover{background:var(--panel-2)}
+.sess.t-ouverte{border-left-color:var(--info)}
+.sess.t-privatisable{border-left-color:var(--brass)}
+.sess.full{opacity:.62}
+.date{display:grid;justify-items:center;line-height:1}
+.date .dw{font-family:var(--f-label);font-size:.78rem;color:var(--muted);letter-spacing:.08em}
+.date .dd{font-family:var(--f-fell);font-weight:700;font-size:1.9rem}
+.date .dm{font-family:var(--f-label);font-size:.78rem;color:var(--muted)}
+.sess .t{font-family:var(--f-fell);font-weight:700;font-size:1.22rem;line-height:1.15}
+.sess .meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:4px;color:var(--muted);font-size:.92rem}
+.sess .right{display:grid;justify-items:end;gap:6px}
+.pips{display:flex;gap:3px}
+.pips i{width:10px;height:10px;border-radius:50%;border:1px solid var(--info);display:block}
+.pips i.on{background:var(--info)}
+.pips i.mine{background:var(--brass);border-color:var(--brass)}
+
+/* Scénarios */
+.scen-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.scen{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px 18px 14px;display:grid;gap:8px;align-content:start;cursor:pointer;text-align:left;width:100%}
+.scen:hover{background:var(--panel-2)}
+.scen.done{border-color:#3f5a3b}
+.scen .sys{font-family:var(--f-label);font-size:.7rem;color:var(--brass);letter-spacing:.12em;text-transform:uppercase;margin-top:-4px}
+.scen h3{padding-right:0}
+.scen p{color:#cfc8b6;font-size:.95rem}
+.scen .foot{display:flex;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:.85rem;margin-top:4px}
+.scen-img{position:relative;height:0;padding-bottom:56.25%;border:1px solid var(--brass-deep);border-radius:2px;background:radial-gradient(ellipse at 50% 40%,#1f1a12,#0d0b08);overflow:hidden;display:grid;place-items:center;box-shadow:inset 0 0 0 4px #0d0b08,inset 0 0 0 5px #3a2c18}
+.scen-img img.pic{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.scen-img .ph{position:absolute;inset:0;display:grid;align-content:center;justify-items:center;gap:8px;color:var(--muted)}
+.scen-img .ph img{width:56px;height:56px;opacity:.35;filter:grayscale(1)}
+.scen-thumb{margin:-18px -18px 4px;aspect-ratio:16/9;overflow:hidden;border-bottom:1px solid var(--line);border-radius:var(--r) var(--r) 0 0}
+.scen-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.img-edit{display:grid;gap:8px}
+.scen .dates{display:grid;gap:6px;margin-top:6px;padding-top:10px;border-top:1px dotted var(--line)}
+.date-btn{display:flex;flex-direction:column;gap:1px;align-items:flex-start;width:100%;background:var(--ink);border:1px solid var(--line);border-radius:var(--r);padding:6px 10px;cursor:pointer;font-size:.92rem;text-align:left}
+.date-btn > span:first-child{white-space:nowrap}
+.date-btn:hover{border-color:var(--brass-deep);background:var(--panel-2)}
+.d-info{color:var(--info);font-size:.85rem;white-space:nowrap}
+.d-brass{color:var(--brass);font-size:.85rem;white-space:nowrap}
+.tick{position:absolute;top:12px;right:12px;z-index:1;display:flex;align-items:center;gap:8px;background:none;border:0;padding:2px;cursor:pointer;color:var(--ok)}
+.tick .tbox{width:24px;height:24px;border-radius:4px;border:1.5px solid var(--muted);background:rgba(11,10,8,.6);display:grid;place-items:center;flex:none}
+.tick:hover .tbox{border-color:var(--bone)}
+.tick[aria-checked="true"] .tbox{background:var(--ok);border-color:var(--ok)}
+.tick svg{width:16px;height:16px;opacity:0}
+.tick[aria-checked="true"] svg{opacity:1}
+.tick .played{display:none;align-items:center;gap:6px;font-family:var(--f-label);font-weight:600;font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;padding:4px 10px 4px 9px;border:1px solid #4f6b44;border-radius:2px;background:linear-gradient(180deg,#1b2517,#141c11);box-shadow:inset 0 0 0 2px #141c11,inset 0 0 0 3px #2e4228;white-space:nowrap}
+.tick .played::before,.tick .played::after{content:"";width:4px;height:4px;border-radius:50%;background:var(--ok)}
+.tick[aria-checked="true"] .played:not(.todo){display:inline-flex;animation:stamp .35s ease-out}
+.tick[aria-checked="false"] .played.todo{display:inline-flex}
+.tick .played.todo{color:var(--warn);border-color:#7a4424;background:linear-gradient(180deg,#2a1810,#1f120b);box-shadow:inset 0 0 0 2px #1f120b,inset 0 0 0 3px #4d2c18}
+.tick .played.todo::before,.tick .played.todo::after{background:var(--warn)}
+@keyframes stamp{from{opacity:0;transform:scale(1.25) rotate(-4deg)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.tick[aria-checked="true"] .played{animation:none}}
+.scen.has-tick{padding-top:50px}
+.tick svg{display:block}
+.progress{height:6px;background:var(--panel-2);border-radius:999px;overflow:hidden}
+.progress b{display:block;height:100%;background:var(--ok)}
+
+/* Tiroir latéral */
+.scrim{position:fixed;inset:0;background:rgba(5,7,6,.6);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.open{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100%);background:var(--panel);border-left:1px solid var(--line);z-index:41;transform:translateX(100%);transition:transform .25s ease;display:flex;flex-direction:column}
+.drawer.open{transform:none}
+.drawer .dh{display:flex;align-items:start;gap:12px;padding:18px 20px;border-bottom:1px solid var(--line)}
+.drawer .dh h2{font-size:1.6rem;flex:1}
+.drawer .db{padding:20px;overflow-y:auto;display:grid;gap:18px;align-content:start}
+.x{background:none;border:1px solid var(--line);border-radius:var(--r);width:34px;height:34px;cursor:pointer;flex:none;font-size:1.2rem;line-height:1}
+@media (prefers-reduced-motion: reduce){.drawer,.scrim{transition:none}}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:.95rem}
+.facts dt{color:var(--muted);font-family:var(--f-label);letter-spacing:.04em}
+.facts dd{margin:0}
+.prose{display:grid;gap:10px;color:#d9d2c0}
+.box{border:1px solid var(--line);border-radius:var(--r);padding:14px;display:grid;gap:10px;background:var(--panel-2)}
+.box.brass{border-color:var(--brass-deep);background:#1f1b11}
+.box.ok{border-color:#3f5a3b;background:#18211a}
+
+/* Formulaires */
+form{display:grid;gap:14px}
+.field{display:grid;gap:5px}
+.field label,.field .lbl{font-family:var(--f-label);font-weight:500;letter-spacing:.04em;font-size:.85rem;color:var(--muted)}
+input[type=text],input[type=email],input[type=password],input[type=number],input[type=date],input[type=time],input[type=tel],input[type=url],select,textarea{width:100%;background:var(--ink);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px}
+textarea{min-height:90px;resize:vertical}
+.fields2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.qty{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px dotted var(--line)}
+.qty .n{flex:1}
+.qty .n small{display:block;color:var(--muted)}
+.qty input{width:64px;text-align:center}
+.radio-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.radio-cards label{border:1px solid var(--line);border-radius:var(--r);padding:10px;cursor:pointer;display:flex;gap:8px;align-items:center}
+.radio-cards input:checked + span{color:var(--brass);font-weight:700}
+.total{display:flex;justify-content:space-between;align-items:baseline;font-size:1.1rem;border-top:1px solid var(--line);padding-top:10px}
+.total b{font-family:var(--f-fell);font-weight:700;font-size:1.6rem;color:var(--brass)}
+.check{display:flex;gap:8px;align-items:center}
+
+/* Compte & MJ */
+.tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:8px 14px;cursor:pointer;font-family:var(--f-label);font-weight:500;letter-spacing:.04em;color:var(--muted)}
+.tabs button[aria-selected="true"]{color:var(--brass);border-bottom-color:var(--brass)}
+.tabs .count{display:inline-block;min-width:20px;padding:0 6px;border-radius:999px;background:var(--warn);color:#201006;font-size:.75rem;margin-left:4px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.stat b{display:block;font-family:var(--f-fell);font-weight:700;font-size:2rem;line-height:1.1;font-variant-numeric:tabular-nums}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r)}
+table{border-collapse:collapse;width:100%;font-size:.94rem}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-label);font-weight:500;letter-spacing:.05em;color:var(--muted);background:var(--panel);font-size:.82rem;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td .sub{color:var(--muted);font-size:.85rem}
+.code-box .code{font-family:var(--f-label);font-weight:600;font-size:1.35rem;letter-spacing:.16em;color:var(--brass)}
+.team{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px}
+.team li{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;padding:6px 0;border-bottom:1px dotted var(--line)}
+.res-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:grid;gap:8px}
+.empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:var(--r)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--bone);color:var(--ink);padding:10px 18px;border-radius:999px;z-index:60;font-weight:500;box-shadow:0 6px 24px rgba(0,0,0,.4)}
+footer{border-top:1px solid var(--line);color:var(--muted);font-size:.88rem;text-align:center;padding:28px 16px;display:grid;gap:10px;justify-items:center}
+footer img{width:96px;height:96px}
+
+@media (max-width:820px){
+  .split,.menu-cols,.contact{grid-template-columns:1fr}
+  .grid3,.steps{grid-template-columns:1fr}
+  .stats{grid-template-columns:1fr 1fr}
+}
+@media (max-width:520px){
+  .sess{grid-template-columns:56px 1fr;}
+  .sess .right{grid-column:1 / -1;justify-items:start;grid-auto-flow:column;justify-content:space-between;align-items:center}
+  .fields2,.radio-cards{grid-template-columns:1fr}
+  .date .dd{font-size:1.6rem}
+}
+</style><style>
+.loading{padding:60px 0;text-align:center;color:var(--muted)}
+.err{color:var(--bad)}
+.box p + p{margin-top:0}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="in">
+    <a class="brand" href="#accueil" aria-label="Accueil, L'imaginarium du Docteur Noirpeste">
+      <img src="assets/logo-rond.png" alt="" width="46" height="46">
+      <span>L'imaginarium du<b>Docteur Noirpeste</b></span>
+    </a>
+    <nav class="main" id="nav" aria-label="Navigation principale"></nav>
+  </div>
+</header>
+<main id="view"><div class="loading">Chargement…</div></main>
+<footer><img src="assets/logo-rond.png" alt="Logo de L'imaginarium du Docteur Noirpeste" width="96" height="96"><span>Salle de jeux de rôle<span id="foot-addr"></span></span><span><a href="mailto:imaginarium.cyril@gmail.com">imaginarium.cyril@gmail.com</a> · <a href="https://www.instagram.com/imaginarium.noirpeste" target="_blank" rel="noopener">Instagram</a></span></footer>
+
+<div class="scrim" id="scrim" onclick="App.closeDrawer()"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+  <div class="dh"><h2 id="drawer-title"></h2><button class="x" type="button" onclick="App.closeDrawer()" aria-label="Fermer">×</button></div>
+  <div class="db" id="drawer-body"></div>
+</aside>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+(function(){
+const SB_URL='https://xkelaxogkkjjkcvgxjsu.supabase.co';
+const SB_KEY='sb_publishable_RjOPp7wzvXJyxanlHMHCQw_JfhLi2gN';
+const sb=window.supabase.createClient(SB_URL,SB_KEY);
+
+const HOUR=36e5, DAY=864e5;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const eur=n=>{n=Number(n)||0; return (Math.round(n*100)/100).toLocaleString('fr-FR',{minimumFractionDigits:Math.round(n*100)%100?2:0,maximumFractionDigits:2})+' €';};
+const T=t=>typeof t==='number'?t:Date.parse(t);
+const fDate=t=>new Date(T(t)).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+const fShort=t=>new Date(T(t)).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
+const fTime=t=>new Date(T(t)).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+const fDT=t=>fShort(t)+' à '+fTime(t);
+const plural=(n,w)=>n+' '+w+(n>1?'s':'');
+
+/* ---------- Données ---------- */
+const D={loaded:false,user:null,profile:null,settings:{paypal:'',adresse:'',duree_option:48},scenarios:[],planning:[],menu:[],done:new Set(),myRes:[],
+  mj:{res:[],profiles:[],sessions:[]}};
+const normS=s=>({...s,date:T(s.date),prix:Number(s.prix)});
+function chk(res){ if(res.error) throw res.error; return res.data; }
+function errMsg(e){
+  const m=(e&&e.message)||String(e);
+  const map={'Invalid login credentials':'E-mail ou mot de passe incorrect.','Email not confirmed':'Confirmez d\'abord votre adresse e-mail (lien reçu par e-mail).',
+    'User already registered':'Un compte existe déjà avec cet e-mail.','Password should be at least 6 characters.':'Le mot de passe doit faire au moins 6 caractères.'};
+  if(map[m]) return map[m];
+  if(/duplicate key.*code/i.test(m)) return 'Ce code de table est déjà utilisé.';
+  if(/violates foreign key/i.test(m)) return 'Impossible : cet élément est encore utilisé ailleurs (par exemple des parties au planning).';
+  if(/rate limit/i.test(m)) return 'Trop de tentatives, réessayez dans quelques minutes.';
+  if(/Failed to fetch|NetworkError/i.test(m)) return 'Connexion impossible. Vérifiez votre accès à Internet.';
+  return m;
+}
+async function loadPublic(){
+  const [st,sc,pl,mn]=await Promise.all([
+    sb.from('settings').select('*').eq('id',1).maybeSingle(),
+    sb.from('scenarios').select('*').order('titre'),
+    sb.rpc('get_planning'),
+    sb.from('menu_items').select('*').order('position').order('nom')]);
+  D.settings=chk(st)||D.settings; D.scenarios=chk(sc)||[]; D.planning=(chk(pl)||[]).map(normS);
+  D.menu=(chk(mn)||[]).map(m=>({...m,prix:Number(m.prix)}));
+}
+async function loadUser(){
+  if(!D.user){D.profile=null;D.done=new Set();D.myRes=[];return;}
+  const [pr,dn,mr]=await Promise.all([
+    sb.from('profiles').select('*').eq('id',D.user.id).maybeSingle(),
+    sb.from('scenario_done').select('scenario_id').eq('user_id',D.user.id),
+    sb.rpc('my_reservations')]);
+  D.profile=chk(pr); D.done=new Set((chk(dn)||[]).map(x=>x.scenario_id));
+  D.myRes=(chk(mr)||[]).map(r=>({...r,prix:Number(r.prix)}));
+}
+async function loadMJ(){
+  if(!D.profile?.is_mj){D.mj={res:[],profiles:[],sessions:[]};return;}
+  const [r,p,s]=await Promise.all([
+    sb.from('reservations').select('*, profiles(pseudo,email)').order('created_at'),
+    sb.from('profiles').select('id,pseudo,email,is_mj').order('pseudo'),
+    sb.rpc('get_planning',{p_depuis:'2000-01-01T00:00:00Z'})]);
+  D.mj={res:chk(r)||[],profiles:chk(p)||[],sessions:(chk(s)||[]).map(normS)};
+}
+async function refresh(){
+  try{ await loadPublic(); await loadUser(); await loadMJ(); D.loaded=true; }
+  catch(e){ console.error(e); toast(errMsg(e)); }
+  render();
+}
+
+/* ---------- Logique ---------- */
+const scen=id=>D.scenarios.find(x=>x.id===id);
+const sess=id=>D.planning.find(x=>x.id===id)||D.mj.sessions.find(x=>x.id===id);
+const isActive=r=>r.statut==='confirmee'||(r.statut==='option'&&(r.paiement_declare||T(r.expires_at)>Date.now()));
+const partsOf=r=>r.parts!=null?Number(r.parts):(r.parent_id?0:Number(r.places||1));
+const repasSum=rep=>(rep||[]).reduce((a,x)=>a+Number(x.prix)*Number(x.qty),0);
+const repasLabel=rep=>{rep=(rep||[]).filter(x=>x.qty>0); return rep.length?rep.map(x=>x.qty+' × '+x.nom).join(', '):'Aucun repas';};
+function totalMine(r){
+  if(r.type==='ouverte') return r.prix*r.places+repasSum(r.repas);
+  const size=r.parent_id?(r.org?.places||1):r.places; return r.prix/size*partsOf(r)+repasSum(r.repas);
+}
+function takenMine(r){ return partsOf(r)+(r.membres||[]).reduce((a,m)=>a+Number(m.parts||0),0); }
+function remaining(t){const ms=T(t)-Date.now(); if(ms<=0) return 'expirée'; const h=Math.floor(ms/HOUR), m=Math.floor((ms%HOUR)/6e4); return h>=1?`reste ${h} h ${String(m).padStart(2,'0')}`:`reste ${m} min`;}
+function statusPill(r,total){
+  if(r.statut==='confirmee') return r.paye?`<span class="pill ok">Confirmée · payée${r.moyen==='especes'?' en espèces':r.moyen==='paypal'?' par PayPal':''}</span>`:(total>0?'<span class="pill ok">Confirmée</span> <span class="pill mute">À régler</span>':'<span class="pill ok">Confirmée</span>');
+  if(r.statut==='option'&&r.parent_id){ const s=sess(r.session_id); const d=r.date||s?.date; return (r.paiement_declare?'<span class="pill info">Paiement à vérifier</span>':'<span class="pill warn">Part à régler</span>')+(d?` <span class="pill mute num">avant le ${fShort(d)}</span>`:''); }
+  if(r.statut==='option') return r.paiement_declare?'<span class="pill info">Paiement à vérifier</span>':`<span class="pill warn">Option</span> <span class="pill warn cd num" data-exp="${T(r.expires_at)}">${remaining(r.expires_at)}</span>`;
+  if(r.statut==='expiree') return '<span class="pill mute">Option expirée</span>';
+  return '<span class="pill bad">Annulée</span>';
+}
+function sessState(s){ return s.type==='ouverte'?(s.libres>0?'libre':'complet'):(s.priv_state||'libre'); }
+function sessPill(s){
+  if(s.type==='ouverte') return s.libres>0?`<span class="pill info num">${s.libres} place${s.libres>1?'s':''} libre${s.libres>1?'s':''}</span>`:'<span class="pill bad">Complet</span>';
+  return {libre:'<span class="pill brass">Libre à privatiser</span>',option:'<span class="pill warn">Option en cours</span>',reservee:'<span class="pill mute">Privatisée</span>'}[sessState(s)];
+}
+const CODE_CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const genCode=()=>'NOIR-'+Array.from({length:4},()=>CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)]).join('');
+
+/* ---------- UI générique ---------- */
+let toastT;
+function toast(msg){let t=$('#toast'); if(!t){t=document.createElement('div');t.id='toast';t.className='toast';t.setAttribute('role','status');document.body.appendChild(t);} t.textContent=msg; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true,3600);}
+let lastFocus=null;
+function openDrawer(title,html){lastFocus=document.activeElement; $('#drawer-title').textContent=title; $('#drawer-body').innerHTML=html; $('#drawer').classList.add('open'); $('#scrim').classList.add('open'); $('#drawer').querySelector('.x').focus();}
+function closeDrawer(){$('#drawer').classList.remove('open'); $('#scrim').classList.remove('open'); if(lastFocus&&lastFocus.focus) lastFocus.focus();}
+document.addEventListener('keydown',e=>{if(e.key==='Escape') closeDrawer();});
+const emptyBox=t=>`<div class="empty">${t}</div>`;
+const check='<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="#13200f" stroke-width="2.2" fill="none"/></svg>';
+function busy(btn,on){ if(!btn) return; btn.disabled=on; if(on){btn.dataset.l=btn.textContent; btn.textContent='Un instant…';} else if(btn.dataset.l) btn.textContent=btn.dataset.l; }
+async function run(btn,fn){ busy(btn,true); try{ return await fn(); } catch(e){ console.error(e); toast(errMsg(e)); } finally{ busy(btn,false); } }
+
+/* ---------- Navigation ---------- */
+const UI={planFilter:'tout',scenFilter:'tous',mjTab:'options'};
+function route(){return (location.hash||'#accueil').slice(1);}
+function renderNav(){
+  const r=route();
+  const items=[['accueil','Accueil'],['planning','Planning'],['scenarios','Scénarios'],['compte',D.profile?D.profile.pseudo:'Mon compte']];
+  if(D.profile?.is_mj) items.push(['mj','Espace MJ']);
+  $('#nav').innerHTML=items.map(([h,l])=>`<a href="#${h}" ${h==='mj'?'class="mj"':''} ${r===h?'aria-current="page"':''}>${esc(l)}</a>`).join('');
+  $('#foot-addr').textContent=D.settings.adresse?' · '+D.settings.adresse:'';
+}
+function render(){
+  renderNav();
+  if(!D.loaded){ $('#view').innerHTML='<div class="loading">Chargement…</div>'; return; }
+  let r=route(); if(r==='mj'&&!D.profile?.is_mj) r='accueil';
+  const v={accueil:vAccueil,planning:vPlanning,scenarios:vScenarios,compte:vCompte,mj:vMJ}[r]||vAccueil;
+  $('#view').innerHTML=v();
+}
+window.addEventListener('hashchange',()=>{closeDrawer();render();window.scrollTo(0,0);});
+setInterval(()=>{document.querySelectorAll('.cd').forEach(el=>el.textContent=remaining(+el.dataset.exp));},30000);
+
+/* ---------- Accueil ---------- */
+function vAccueil(){
+  const next=D.planning.filter(s=>s.date>Date.now()).slice(0,3);
+  const dur=D.settings.duree_option;
+  return `
+  <section class="hero">
+    <h1 class="sr">L'imaginarium du Docteur Noirpeste, salle de jeux de rôle</h1>
+    <img class="banner" src="assets/banniere.jpg" alt="Bannière de L'imaginarium du Docteur Noirpeste : le docteur au masque de peste dans son cabinet de curiosités" width="1600" height="643">
+    <div class="orn" style="width:min(440px,80%)" aria-hidden="true"><i></i></div>
+    <p class="lead">Des parties ouvertes où l'on rejoint une table à la place, des créneaux à privatiser pour votre groupe, et de quoi se restaurer pendant la séance.</p>
+    <div class="row" style="justify-content:center"><a class="btn primary" href="#planning">Voir le planning</a><a class="btn" href="#scenarios">Parcourir les scénarios</a></div>
+  </section>
+  <section style="display:grid;gap:16px">
+    <div class="sec-head"><h2>Prochaines parties</h2><a href="#planning">Tout le planning →</a></div>
+    <div class="week">${next.map(sessRow).join('')||emptyBox('Le planning arrive bientôt.')}</div>
+  </section>
+  ${D.menu.some(m=>m.dispo)?`<section style="display:grid;gap:16px">
+    <div class="sec-head"><h2>À table</h2></div>
+    <div class="menu-list menu-cols">${D.menu.filter(m=>m.dispo).map(m=>`<div class="it"><div><div class="n">${esc(m.nom)}</div><div class="d">${esc(m.descr)}</div></div><div class="p">${eur(m.prix)}</div></div>`).join('')}</div>
+    <p class="note">À commander au moment de la réservation, servi pendant le jeu.<br>Si vous avez un régime alimentaire particulier, n'hésitez pas à le faire savoir.</p>
+  </section>`:''}
+  <section style="display:grid;gap:16px">
+    <div class="sec-head"><h2>Comment réserver</h2></div>
+    <div class="steps">
+      <div class="card"><h3>Posez une option</h3><p class="muted">Choisissez une place sur une partie ouverte ou privatisez un créneau, et ajoutez votre repas. La place est bloquée ${dur} h.</p></div>
+      <div class="card"><h3>Réglez par PayPal</h3><p class="muted">Le lien de paiement s'affiche après la réservation. Signalez votre paiement en un clic.</p></div>
+      <div class="card"><h3>Le docteur valide</h3><p class="muted">Le MJ confirme votre réservation. Sans paiement ni validation sous ${dur} h, l'option est libérée.</p></div>
+    </div>
+  </section>
+  <section style="display:grid;gap:16px">
+    <div class="sec-head"><h2>Me contacter</h2></div>
+    <div class="contact">
+      <a class="card contact-card" href="mailto:imaginarium.cyril@gmail.com">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+        <span><span class="label">E-mail</span><b>imaginarium.cyril@gmail.com</b></span></a>
+      <a class="card contact-card" href="https://www.instagram.com/imaginarium.noirpeste" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor"/></svg>
+        <span><span class="label">Instagram</span><b>@imaginarium.noirpeste</b></span></a>
+    </div>
+  </section>`;
+}
+
+/* ---------- Planning ---------- */
+function sessRow(s){
+  const sc=scen(s.scenario_id)||{titre:'Scénario',systeme:''}; const d=new Date(s.date);
+  let pips='';
+  if(s.type==='ouverte'){
+    const mine=D.myRes.filter(r=>r.session_id===s.id&&r.active&&!r.parent_id).reduce((a,r)=>a+Number(r.places),0);
+    pips='<span class="pips" aria-hidden="true">'+Array.from({length:s.places},(_,i)=>`<i class="${i<mine?'mine':i<s.pris?'on':''}"></i>`).join('')+'</span>';
+  }
+  const full=(s.type==='ouverte'&&s.libres<=0)||(s.type==='privatisable'&&sessState(s)!=='libre');
+  return `<button type="button" class="sess t-${s.type} ${full?'full':''}" onclick="App.openSession('${s.id}')">
+    <span class="date"><span class="dw">${d.toLocaleDateString('fr-FR',{weekday:'short'})}</span><span class="dd num">${d.getDate()}</span><span class="dm">${d.toLocaleDateString('fr-FR',{month:'short'})}</span></span>
+    <span><span class="t">${esc(sc.titre)}</span>
+      <span class="meta"><span class="num">${fTime(s.date)}</span>${sc.systeme?`<span>· ${esc(sc.systeme)}</span>`:''}<span>· ${s.type==='ouverte'?'Partie ouverte':'Privatisable'}</span></span></span>
+    <span class="right">${sessPill(s)}${pips}<span class="muted num" style="font-size:.88rem">${s.type==='ouverte'?eur(s.prix)+' / place':eur(s.prix)+' la table'}</span></span>
+  </button>`;
+}
+function vPlanning(){
+  const f=UI.planFilter;
+  let list=D.planning.slice();
+  if(f==='ouverte') list=list.filter(s=>s.type==='ouverte');
+  if(f==='privatisable') list=list.filter(s=>s.type==='privatisable');
+  if(f==='dispo') list=list.filter(s=>sessState(s)==='libre');
+  const groups={};
+  list.forEach(s=>{const d=new Date(s.date); const mon=new Date(d); mon.setDate(d.getDate()-((d.getDay()+6)%7)); mon.setHours(0,0,0,0); (groups[mon.getTime()]??=[]).push(s);});
+  const chips=[['tout','Tout'],['dispo','Encore disponibles'],['ouverte','Parties ouvertes'],['privatisable','Privatisables']];
+  return `<section style="display:grid;gap:18px">
+    <div class="sec-head"><div><h2>Planning des parties</h2><p class="muted" style="margin-top:6px">Touchez une partie pour réserver une place ou poser une option de privatisation.</p><button class="btn small" type="button" style="margin-top:10px" onclick="App.openJoin()">Un ami vous a donné un code de table ?</button></div>
+    <div class="filters" role="group" aria-label="Filtrer">${chips.map(([k,l])=>`<button class="chip" type="button" aria-pressed="${f===k}" onclick="App.planFilter('${k}')">${l}</button>`).join('')}</div></div>
+    <div class="row muted" style="font-size:.88rem;gap:16px"><span><span class="pill info">Bleu</span> partie ouverte, à la place</span><span><span class="pill brass">Bronze</span> créneau à privatiser pour un groupe</span></div>
+    ${Object.entries(groups).map(([w,ss])=>`<div class="week"><div class="label">Semaine du ${new Date(+w).toLocaleDateString('fr-FR',{day:'numeric',month:'long'})}</div>${ss.map(sessRow).join('')}</div>`).join('')||emptyBox(D.planning.length?'Aucune partie ne correspond à ce filtre.':'Aucune partie programmée pour le moment.')}
+  </section>`;
+}
+function loginBox(after){
+  return `<div class="box brass"><p>Créez un compte joueur ou connectez-vous pour réserver.</p><div class="row"><a class="btn primary" href="#compte" onclick="App.closeDrawer()">Créer un compte ou me connecter</a></div></div>`;
+}
+function openSession(id){
+  const s=D.planning.find(x=>x.id===id); if(!s){toast('Cette partie n\'est plus au planning.');return;}
+  const sc=scen(s.scenario_id)||{titre:'?',min_joueurs:1,max_joueurs:6,systeme:'',duree:''};
+  const mineRes=D.myRes.filter(r=>r.session_id===id&&r.active);
+  let html=`<dl class="facts"><dt>Date</dt><dd>${fDate(s.date)} à ${fTime(s.date)}</dd>${sc.systeme?`<dt>Système</dt><dd>${esc(sc.systeme)}</dd>`:''}${sc.duree?`<dt>Durée</dt><dd>${esc(sc.duree)}</dd>`:''}<dt>Formule</dt><dd>${s.type==='ouverte'?`Partie ouverte · ${eur(s.prix)} la place`:`Privatisation · ${eur(s.prix)} la table (${sc.min_joueurs} à ${sc.max_joueurs} joueurs)`}</dd><dt>Disponibilité</dt><dd>${sessPill(s)}</dd>${s.note?`<dt>Note</dt><dd>${esc(s.note)}</dd>`:''}</dl>
+  ${sc.accroche?`<p class="prose">${esc(sc.accroche)}</p>`:''}<div class="row"><button class="btn small ghost" type="button" onclick="App.openScenario('${sc.id}')">Lire la fiche du scénario</button></div>`;
+  if(mineRes.length) html+=mineRes.map(r=>`<div class="box brass"><div class="row">${statusPill(r,totalMine(r))}</div><p>${s.type==='ouverte'?'Vous avez déjà '+plural(r.places,'place')+' sur cette partie.':r.parent_id?'Vous avez rejoint cette table privatisée.':'Vous avez privatisé cette table.'}</p><a class="btn small" href="#compte" onclick="App.closeDrawer()">Voir dans mon compte</a></div>`).join('');
+  const bookable=sessState(s)==='libre';
+  if(!bookable){ html+=`<div class="box"><p>${s.type==='ouverte'?'Cette partie est complète.':'Ce créneau est déjà privatisé ou sous option.'} Les options non confirmées sont libérées après ${D.settings.duree_option} h : revenez voir.</p>${s.type==='privatisable'&&!mineRes.length?`<p>Un ami a privatisé cette table ? Rejoignez-la avec son code.</p><div class="row"><button class="btn small primary" type="button" onclick="App.openJoin()">J'ai un code de table</button></div>`:''}</div>`; }
+  else if(!D.user) html+=loginBox();
+  else html+=bookingForm(s,sc);
+  openDrawer(sc.titre,html); updateTotal();
+}
+const menuInputs=(prefix='q')=>D.menu.filter(m=>m.dispo).map(m=>`<div class="qty"><span class="n">${esc(m.nom)}<small>${esc(m.descr)}${m.descr?' · ':''}${eur(m.prix)}</small></span><input type="number" min="0" max="30" value="0" id="${prefix}-${m.id}" name="${prefix}-${m.id}" aria-label="Quantité ${esc(m.nom)}"></div>`).join('');
+function readRepas(f,prefix='q'){const o={}; D.menu.forEach(m=>{const q=f[prefix+'-'+m.id]; if(q&&+q.value>0) o[m.id]=Math.min(30,Math.round(+q.value));}); return o;}
+function repasFormTotal(f,prefix='q'){let t=0; D.menu.forEach(m=>{const q=f[prefix+'-'+m.id]; if(q) t+=Math.max(0,+q.value||0)*m.prix;}); return t;}
+function bookingForm(s,sc){
+  const priv=s.type==='privatisable';
+  const opts=priv?Array.from({length:sc.max_joueurs-sc.min_joueurs+1},(_,i)=>sc.min_joueurs+i):Array.from({length:s.libres},(_,i)=>i+1);
+  const def=priv?sc.max_joueurs:1;
+  return `<form id="book" onsubmit="App.book(event,'${s.id}')" oninput="App.updateTotal()">
+    <h3>${priv?'Poser une option de privatisation':'Réserver des places'}</h3>
+    <div class="fields2">
+      <div class="field"><label for="b-places">${priv?'Nombre de joueurs à la table':'Nombre de places'}</label><select id="b-places" name="places">${opts.map(n=>`<option value="${n}" ${n===def?'selected':''}>${n}</option>`).join('')}</select></div>
+      ${priv?`<div class="field"><label for="b-groupe">Nom du groupe</label><input id="b-groupe" name="groupe" type="text" maxlength="80" placeholder="Facultatif"></div>`:''}
+    </div>
+    ${priv?`<div class="box">
+      <div class="fields2"><div class="field"><label for="b-parts">Parts que vous réglez</label><input id="b-parts" name="parts" type="number" min="1" max="${def}" value="${def}"></div>
+      <div class="field"><span class="lbl">Prix d'une part</span><b id="b-part" class="num" style="padding:8px 0">${eur(s.prix/def)}</b></div></div>
+      <p class="muted" style="font-size:.92rem">La table coûte ${eur(s.prix)}, partagée en autant de parts que de joueurs. Réglez tout, ou seulement votre part : dès que vous avez réglé, la table vous est réservée. Vos amis ont ensuite jusqu'à la partie pour régler les leurs avec le code ci-dessous.</p>
+      <div class="field"><label for="b-code">Code à donner à vos amis</label><input id="b-code" name="code" type="text" value="${genCode()}" maxlength="16" pattern="[A-Za-z0-9\\- ]{4,16}" title="4 à 16 lettres, chiffres ou tirets" style="font-family:var(--f-label);letter-spacing:.12em;text-transform:uppercase" autocomplete="off"></div>
+      <p class="note">Vous pouvez le personnaliser. Avec ce code, vos amis rejoignent la table, choisissent leurs parts et leur repas.</p>
+    </div>`:''}
+    ${D.menu.some(m=>m.dispo)?`<div class="field"><span class="lbl">Repas sur place</span>${menuInputs()}</div>`:''}
+    <div class="field"><span class="lbl">Paiement</span>
+      <p class="muted">Par PayPal : le lien s'affiche une fois l'option posée. Vous réglez en espèces sur place ? Dites-le dans le mot au MJ, il peut valider sans paiement en ligne.</p></div>
+    <div class="field"><label for="b-note">Un mot pour le MJ</label><textarea id="b-note" name="note" maxlength="1000" style="min-height:60px" placeholder="Allergies, paiement en espèces, première partie…"></textarea></div>
+    <div class="total"><span>Votre total</span><b id="b-total" class="num" data-type="${s.type}" data-prix="${s.prix}">${eur(s.prix)}</b></div>
+    <button class="btn primary" type="submit">Poser l'option (${D.settings.duree_option} h)</button>
+    <p class="note">Rien n'est débité ici. La réservation est confirmée quand le MJ la valide.</p>
+  </form>`;
+}
+function updateTotal(){
+  const f=$('#book'); const t=$('#b-total'); if(!f||!t) return;
+  const places=+f.places.value; let tot;
+  if(t.dataset.type==='ouverte') tot=places*(+t.dataset.prix);
+  else{ const p=f.parts; p.max=places; const k=Math.min(places,Math.max(1,Math.round(+p.value||1)));
+    const unit=(+t.dataset.prix)/places; $('#b-part').textContent=eur(unit); tot=unit*k; }
+  t.textContent=eur(tot+repasFormTotal(f));
+}
+async function book(e,sid){
+  e.preventDefault(); const f=e.target; const s=D.planning.find(x=>x.id===sid); const btn=f.querySelector('[type=submit]');
+  const places=+f.places.value;
+  const params={p_session:sid,p_places:places,p_repas:readRepas(f),p_note:f.note.value.trim()};
+  if(s.type==='privatisable'){ params.p_parts=Math.min(places,Math.max(1,Math.round(+f.parts.value||1))); params.p_code=f.code.value; params.p_groupe=f.groupe.value.trim(); }
+  await run(btn,async()=>{
+    const r=chk(await sb.rpc('book_session',params));
+    await refresh(); const mine=D.myRes.find(x=>x.id===r.id);
+    openDrawer('Option posée',mine?payInstructions(mine):'<p>Option posée.</p>');
+  });
+}
+function codeBox(r){
+  return `<div class="box brass code-box"><span class="label">Code de la table</span>
+    <div class="row" style="justify-content:space-between"><b class="code">${esc(r.code)}</b><button class="btn small" type="button" onclick="App.copyCode('${esc(r.code)}')">Copier le code</button></div>
+    <p class="muted" style="font-size:.92rem">Donnez-le à vos amis : sur le site, ils cliquent sur « J'ai un code de table », choisissent leurs parts et leur repas. Ils ont jusqu'à la partie pour régler.</p>
+    <p class="num" style="font-size:.92rem">Parts réservées : <b>${takenMine(r)} / ${r.places}</b> · ${eur(r.prix/r.places)} la part</p></div>`;
+}
+function payInstructions(r){
+  const tot=totalMine(r); const priv=r.type==='privatisable'; const pp=D.settings.paypal;
+  return `<div class="box brass"><div class="row">${statusPill(r,tot)}</div>
+    <p><b>${esc(r.scenario_titre)}</b>, ${fDate(r.date)} à ${fTime(r.date)}.${priv&&r.parent_id?`<br>Table privatisée par ${esc(r.org?.pseudo||'?')} · ${plural(partsOf(r),'part')}.`:''}${priv&&!r.parent_id?`<br>Vous réglez ${plural(partsOf(r),'part')} sur ${r.places}.`:''}
+    <br>${r.parent_id?'Vous avez jusqu\'à la partie pour régler votre part.':r.statut==='option'?(priv?`Votre option tient jusqu'au <b>${fDT(r.expires_at)}</b>. Dès que vous réglez votre part, la table est à vous : vos amis ont ensuite jusqu'à la partie pour régler les leurs.`:`Votre option tient jusqu'au <b>${fDT(r.expires_at)}</b>.`):''}</p></div>
+    ${priv&&!r.parent_id&&r.code?codeBox(r):''}
+    ${tot>0&&!r.paye?`<div class="box"><h3>Régler ${eur(tot)}</h3>
+      ${pp?`<p>Payez par <b>PayPal</b> via <a href="${esc(pp)}" target="_blank" rel="noopener">${esc(pp.replace(/^https?:\/\//,''))}</a>, en indiquant en message : <b>« ${esc(D.profile?.pseudo||'')} · ${fShort(r.date)} »</b></p>`:`<p>Le lien de paiement sera bientôt disponible. En attendant, contactez le MJ.</p>`}
+      ${r.paiement_declare?'<p class="muted">Paiement signalé, le MJ va vérifier.</p>':`<button class="btn primary" type="button" onclick="App.declarePaid(this,'${r.id}')">J'ai effectué le paiement</button>`}
+      <p class="note">Vous réglez en espèces sur place ? Prévenez le MJ : il peut valider votre réservation sans paiement en ligne.</p></div>`:tot>0?'':`<div class="box"><p>Rien à régler en ligne : le MJ validera votre place.</p></div>`}
+    <p class="muted">Repas : ${esc(repasLabel(r.repas))}</p>
+    <a class="btn ghost" href="#compte" onclick="App.closeDrawer()">Voir mes réservations</a>`;
+}
+async function declarePaid(btn,id){ await run(btn,async()=>{ chk(await sb.rpc('declare_paid',{p_id:id})); await refresh(); closeDrawer(); toast('Paiement signalé. Le MJ va vérifier et confirmer.'); }); }
+
+/* ---------- Rejoindre une table ---------- */
+function openJoin(code){
+  if(!D.user){openDrawer('Rejoindre une table',loginBox());return;}
+  openDrawer('Rejoindre une table',`<form onsubmit="App.joinLookup(event)">
+    <p class="muted">Saisissez le code que vous a donné la personne qui a privatisé la table.</p>
+    <div class="field"><label for="j-code">Code de table</label><input id="j-code" name="code" type="text" required value="${esc(code||'')}" placeholder="Ex. NOIR-7KQ2" style="font-family:var(--f-label);letter-spacing:.12em;text-transform:uppercase" autocomplete="off"></div>
+    <button class="btn primary" type="submit">Trouver la table</button></form>`);
+}
+async function joinLookup(e){
+  e.preventDefault(); const code=e.target.code.value; const btn=e.target.querySelector('[type=submit]');
+  await run(btn,async()=>{
+    const rows=chk(await sb.rpc('find_table',{p_code:code})); const t=rows&&rows[0];
+    if(!t){toast('Aucune table active avec ce code. Vérifiez-le auprès de votre ami.');return;}
+    if(t.est_organisateur){toast('C\'est votre propre table.');return;}
+    if(t.deja_membre){const m=D.myRes.find(x=>x.id===t.deja_membre); if(m) openDrawer('Paiement',payInstructions(m)); toast('Vous avez déjà rejoint cette table.');return;}
+    const libres=Math.max(0,t.group_size-t.parts_taken); const pp=Number(t.prix)/t.group_size;
+    openDrawer('Rejoindre une table',`<div class="box brass"><b style="font-family:var(--f-fell);font-size:1.2rem">${esc(t.scenario_titre)}</b>
+      <p>${fDate(t.date)} à ${fTime(t.date)}<br>Table privatisée par <b>${esc(t.organisateur)}</b>${t.groupe?' · « '+esc(t.groupe)+' »':''} · ${t.group_size} joueurs</p>
+      <p class="num">Parts encore à régler : <b>${libres} / ${t.group_size}</b> · ${eur(pp)} la part</p></div>
+      <form id="join" onsubmit="App.joinSubmit(event,'${esc(code)}')" oninput="App.joinTotal(${pp})">
+        <div class="field"><label for="jn-parts">Parts que vous réglez</label><input id="jn-parts" name="parts" type="number" min="0" max="${libres}" value="${Math.min(1,libres)}"></div>
+        ${libres===0?'<p class="muted">Toutes les parts sont déjà prises : vous rejoignez la table pour votre repas uniquement.</p>':''}
+        ${D.menu.some(m=>m.dispo)?`<div class="field"><span class="lbl">Repas sur place</span>${menuInputs('jq')}</div>`:''}
+        <div class="field"><label for="jn-note">Un mot pour le MJ</label><textarea id="jn-note" name="note" maxlength="1000" style="min-height:60px" placeholder="Allergies, paiement en espèces…"></textarea></div>
+        <div class="total"><span>Votre total</span><b id="jn-total" class="num">${eur(pp*Math.min(1,libres))}</b></div>
+        <button class="btn primary" type="submit">Rejoindre la table</button>
+      </form>`);
+  });
+}
+function joinTotal(pp){const f=$('#join'); if(!f) return; const k=Math.max(0,Math.min(+f.parts.max,Math.round(+f.parts.value||0))); $('#jn-total').textContent=eur(k*pp+repasFormTotal(f,'jq'));}
+async function joinSubmit(e,code){
+  e.preventDefault(); const f=e.target; const btn=f.querySelector('[type=submit]');
+  await run(btn,async()=>{
+    const r=chk(await sb.rpc('join_table',{p_code:code,p_parts:Math.max(0,Math.round(+f.parts.value||0)),p_repas:readRepas(f,'jq'),p_note:f.note.value.trim()}));
+    await refresh(); const m=D.myRes.find(x=>x.id===r.id); openDrawer('Vous avez rejoint la table',m?payInstructions(m):'');
+  });
+}
+function copyCode(c){ try{ navigator.clipboard.writeText(c).then(()=>toast('Code copié : '+c),()=>toast('Code : '+c)); }catch(err){ toast('Code : '+c); } }
+
+/* ---------- Scénarios ---------- */
+function vScenarios(){
+  const u=D.profile; const f=UI.scenFilter;
+  let list=D.scenarios.slice();
+  if(u&&f==='faits') list=list.filter(s=>D.done.has(s.id));
+  if(u&&f==='afaire') list=list.filter(s=>!D.done.has(s.id));
+  const n=D.scenarios.filter(s=>D.done.has(s.id)).length;
+  return `<section style="display:grid;gap:18px">
+    <div class="sec-head"><div><h2>Scénarios disponibles</h2><p class="muted" style="margin-top:6px">${plural(D.scenarios.length,'scénario')} au catalogue. ${u?'Cochez ceux que vous avez déjà joués.':'<a href="#compte">Connectez-vous</a> pour cocher ceux que vous avez joués.'}</p></div>
+    ${u?`<div class="filters" role="group" aria-label="Filtrer">${[['tous','Tous'],['afaire','Pas encore joués'],['faits','Déjà joués']].map(([k,l])=>`<button class="chip" type="button" aria-pressed="${f===k}" onclick="App.scenFilter('${k}')">${l}</button>`).join('')}</div>`:''}</div>
+    ${u&&D.scenarios.length?`<div style="display:grid;gap:6px;max-width:420px"><span class="label">Votre parcours · <span class="num">${n} / ${D.scenarios.length}</span> joués</span><div class="progress"><b style="width:${n/D.scenarios.length*100}%"></b></div></div>`:''}
+    <div class="scen-grid">${list.map(scenCard).join('')||emptyBox(D.scenarios.length?'Rien ici pour le moment.':'Le catalogue arrive bientôt.')}</div>
+  </section>`;
+}
+function imgSlot(src,alt){
+  return `<div class="scen-img">${src?`<img class="pic" src="${esc(src)}" alt="${esc(alt)}">`:`<div class="ph"><img src="assets/logo-rond.png" alt=""><span class="label">Illustration à venir</span></div>`}</div>`;
+}
+function scenCard(s){
+  const u=D.profile; const done=u&&D.done.has(s.id);
+  const dispo=D.planning.filter(x=>x.scenario_id===s.id&&x.type==='ouverte'&&x.date>Date.now()&&x.libres>0);
+  const shown=dispo.slice(0,3);
+  return `<div class="scen ${done?'done':''} ${u&&!s.image_url?'has-tick':''}" role="button" tabindex="0" onclick="App.openScenario('${s.id}')" onkeydown="if(event.key==='Enter')App.openScenario('${s.id}')">
+    ${u?`<button type="button" class="tick" role="checkbox" aria-checked="${!!done}" aria-label="Déjà joué : ${esc(s.titre)}" onclick="event.stopPropagation();App.toggleDone('${s.id}')"><span class="played" aria-hidden="true">Déjà joué</span><span class="played todo" aria-hidden="true">À faire</span><span class="tbox">${check}</span></button>`:''}
+    ${s.image_url?`<div class="scen-thumb"><img src="${esc(s.image_url)}" alt="" loading="lazy"></div>`:''}
+    <h3>${esc(s.titre)}</h3>${s.systeme?`<span class="sys">${esc(s.systeme)}</span>`:''}${s.accroche?`<p>${esc(s.accroche)}</p>`:''}
+    <div class="foot">${s.duree?`<span>${esc(s.duree)}</span>`:''}<span>· ${s.min_joueurs}–${s.max_joueurs} joueurs</span>${s.niveau?`<span>· ${esc(s.niveau)}</span>`:''}</div>
+    ${shown.length?`<div class="dates"><span class="label">Dates disponibles</span>
+      ${shown.map(d=>`<button type="button" class="date-btn" onclick="event.stopPropagation();App.openSession('${d.id}')"><span class="num">${fShort(d.date)} · ${fTime(d.date).replace(':','h')}</span><span class="d-info num">${plural(d.libres,'place')}</span></button>`).join('')}
+      ${dispo.length>3?`<span class="muted" style="font-size:.85rem">+ ${dispo.length-3} autre${dispo.length-3>1?'s':''} date${dispo.length-3>1?'s':''}</span>`:''}
+    </div>`:''}
+  </div>`;
+}
+function openScenario(id){
+  const s=scen(id); if(!s) return; const u=D.profile; const done=u&&D.done.has(id);
+  const dates=D.planning.filter(x=>x.scenario_id===id&&x.date>Date.now());
+  openDrawer(s.titre,`
+    ${imgSlot(s.image_url,'Illustration du scénario '+s.titre)}
+    ${s.systeme?`<div class="row"><span class="pill brass">${esc(s.systeme)}</span></div>`:''}
+    ${s.accroche?`<p class="prose" style="font-family:var(--f-fell);font-style:italic;font-size:1.1rem">${esc(s.accroche)}</p>`:''}
+    <dl class="facts">${s.duree?`<dt>Durée</dt><dd>${esc(s.duree)}</dd>`:''}<dt>Joueurs</dt><dd>${s.min_joueurs} à ${s.max_joueurs}</dd>${s.ambiance?`<dt>Ambiance</dt><dd>${esc(s.ambiance)}</dd>`:''}${s.niveau?`<dt>Niveau</dt><dd>${esc(s.niveau)}</dd>`:''}${s.pj?`<dt>Personnages</dt><dd>${esc(s.pj)}</dd>`:''}${s.avert?`<dt>Thèmes sensibles</dt><dd>${esc(s.avert)}</dd>`:''}</dl>
+    ${s.description?`<div class="prose">${esc(s.description).split('\n').filter(Boolean).map(p=>`<p>${p}</p>`).join('')}</div>`:''}
+    ${u?`<label class="check box ${done?'ok':''}"><input type="checkbox" ${done?'checked':''} onchange="App.toggleDone('${id}',true)"> <span>J'ai déjà joué ce scénario</span></label>`:`<p class="note"><a href="#compte" onclick="App.closeDrawer()">Connectez-vous</a> pour le marquer comme joué.</p>`}
+    <div style="display:grid;gap:8px"><h3>Prochaines dates</h3>${dates.map(d=>`<button class="btn" type="button" style="justify-content:space-between" onclick="App.openSession('${d.id}')"><span>${fShort(d.date)} · ${fTime(d.date)}</span>${sessPill(d)}</button>`).join('')||'<p class="muted">Pas de date prévue. Vous pouvez demander une privatisation au MJ.</p>'}</div>
+  `);
+}
+async function toggleDone(id,fromDrawer){
+  if(!D.user) return; const had=D.done.has(id);
+  had?D.done.delete(id):D.done.add(id); render(); if(fromDrawer) openScenario(id);
+  try{ if(had) chk(await sb.from('scenario_done').delete().eq('user_id',D.user.id).eq('scenario_id',id));
+       else chk(await sb.from('scenario_done').insert({user_id:D.user.id,scenario_id:id})); }
+  catch(e){ had?D.done.add(id):D.done.delete(id); render(); toast(errMsg(e)); }
+}
+
+/* ---------- Compte ---------- */
+let authMsg='';
+function vCompte(){
+  if(!D.user) return `${authMsg?`<div class="box ok" style="margin-bottom:8px">${authMsg}</div>`:''}<section class="split">
+    <form class="card" onsubmit="App.signup(event)"><h2>Créer un compte joueur</h2>
+      <div class="field"><label for="su-p">Pseudo</label><input id="su-p" name="pseudo" type="text" required maxlength="40" autocomplete="nickname"></div>
+      <div class="field"><label for="su-e">E-mail</label><input id="su-e" name="email" type="email" required autocomplete="email"></div>
+      <div class="field"><label for="su-w">Mot de passe (6 caractères minimum)</label><input id="su-w" name="pw" type="password" required minlength="6" autocomplete="new-password"></div>
+      <button class="btn primary" type="submit">Créer mon compte</button>
+      <p class="note">Vous recevrez un e-mail pour confirmer votre adresse.</p></form>
+    <form class="card" onsubmit="App.login(event)"><h2>Se connecter</h2>
+      <div class="field"><label for="li-e">E-mail</label><input id="li-e" name="email" type="email" required autocomplete="email"></div>
+      <div class="field"><label for="li-w">Mot de passe</label><input id="li-w" name="pw" type="password" required autocomplete="current-password"></div>
+      <button class="btn" type="submit">Se connecter</button>
+      <button class="btn ghost" type="button" onclick="App.forgot()">Mot de passe oublié ?</button></form>
+  </section>`;
+  const mine=D.myRes.slice().sort((a,b)=>T(a.date)-T(b.date));
+  const up=mine.filter(r=>r.active&&T(r.date)>Date.now()-3*HOUR); const past=mine.filter(r=>!up.includes(r)).reverse();
+  const n=D.scenarios.filter(s=>D.done.has(s.id)).length;
+  return `<section style="display:grid;gap:22px">
+    <div class="sec-head"><div><span class="label">Compte joueur</span><h2>${esc(D.profile?.pseudo||'')}</h2><p class="muted">${esc(D.user.email||'')}</p></div><button class="btn ghost small" type="button" onclick="App.logout()">Se déconnecter</button></div>
+    <div class="grid3">
+      <div class="card"><span class="label">Scénarios joués</span><b style="font-family:var(--f-fell);font-weight:700;font-size:2rem" class="num">${n} / ${D.scenarios.length}</b><div class="progress"><b style="width:${D.scenarios.length?n/D.scenarios.length*100:0}%"></b></div><a href="#scenarios">Voir le catalogue →</a></div>
+      <div class="card"><span class="label">Réservations à venir</span><b style="font-family:var(--f-fell);font-weight:700;font-size:2rem" class="num">${up.length}</b><a href="#planning">Réserver une partie →</a></div>
+      <div class="card"><span class="label">Mes personnages</span><p>L'application de fiches de personnage sera reliée ici.</p><button class="btn small" type="button" disabled>Ouvrir mes fiches · bientôt</button></div>
+    </div>
+    <div class="row" style="justify-content:space-between"><h3>Mes réservations</h3><button class="btn small" type="button" onclick="App.openJoin()">J'ai un code de table</button></div>
+    <div style="display:grid;gap:10px">${up.map(resCardPlayer).join('')||emptyBox('Aucune réservation en cours. <a href="#planning">Voir le planning</a>')}</div>
+    ${past.length?`<details><summary class="label" style="cursor:pointer">Historique (${past.length})</summary><div style="display:grid;gap:10px;margin-top:10px">${past.map(resCardPlayer).join('')}</div></details>`:''}
+  </section>`;
+}
+function resCardPlayer(r){
+  const tot=totalMine(r); let what;
+  if(r.type==='ouverte') what=plural(r.places,'place');
+  else if(r.parent_id) what='table de '+esc(r.org?.pseudo||'?')+' · '+plural(partsOf(r),'part');
+  else what='privatisation'+(r.groupe?' « '+esc(r.groupe)+' »':'')+' · '+r.places+' joueurs · '+plural(partsOf(r),'part')+' réglée'+(partsOf(r)>1?'s':'')+' par vous';
+  const team=(r.type==='privatisable'&&!r.parent_id&&r.active)?(r.membres||[]):[];
+  const canPay=r.active&&!r.paye&&!r.paiement_declare&&tot>0;
+  return `<div class="res-card"><div class="row" style="justify-content:space-between"><b style="font-family:var(--f-fell);font-weight:700;font-size:1.2rem">${esc(r.scenario_titre)}</b><span class="row">${statusPill(r,tot)}</span></div>
+    <div class="muted">${fDate(r.date)} à ${fTime(r.date)} · ${what} · ${eur(tot)}</div>
+    <div class="muted" style="font-size:.9rem">Repas : ${esc(repasLabel(r.repas))}</div>
+    ${r.type==='privatisable'&&!r.parent_id&&r.code&&r.active?codeBox(r):''}
+    ${team.length?`<div style="font-size:.9rem"><span class="label">Vos amis à la table</span><ul class="team">${team.map(j=>`<li><span>${esc(j.pseudo)} · ${plural(Number(j.parts||0),'part')}</span><span class="row">${statusPill({...j,parent_id:r.id,date:r.date},Number(j.parts||0))}</span></li>`).join('')}</ul></div>`:''}
+    ${canPay||r.statut==='option'?`<div class="row">${canPay?`<button class="btn small primary" type="button" onclick="App.showPay('${r.id}')">Payer / j'ai payé</button>`:''}${r.statut==='option'?`<button class="btn small danger" type="button" onclick="App.cancelMine(this,'${r.id}')">${r.parent_id?'Quitter la table':r.type==='privatisable'?'Annuler la privatisation':'Annuler l\'option'}</button>`:''}</div>`:''}
+  </div>`;
+}
+async function signup(e){
+  e.preventDefault(); const f=e.target; const btn=f.querySelector('[type=submit]');
+  await run(btn,async()=>{
+    const {data,error}=await sb.auth.signUp({email:f.email.value.trim(),password:f.pw.value,options:{data:{pseudo:f.pseudo.value.trim()},emailRedirectTo:location.origin+location.pathname+'#compte'}});
+    if(error) throw error;
+    if(!data.session){ authMsg='Compte créé ! Ouvrez l\'e-mail de confirmation que nous venons de vous envoyer, puis revenez vous connecter.'; render(); }
+    else toast('Bienvenue, '+f.pseudo.value.trim()+' !');
+  });
+}
+async function login(e){
+  e.preventDefault(); const f=e.target; const btn=f.querySelector('[type=submit]');
+  await run(btn,async()=>{ const {error}=await sb.auth.signInWithPassword({email:f.email.value.trim(),password:f.pw.value}); if(error) throw error; authMsg=''; toast('Connexion réussie.'); });
+}
+function forgot(){
+  openDrawer('Mot de passe oublié',`<form onsubmit="App.sendReset(event)"><p class="muted">Indiquez votre e-mail : vous recevrez un lien pour choisir un nouveau mot de passe.</p>
+    <div class="field"><label for="fg-e">E-mail</label><input id="fg-e" name="email" type="email" required autocomplete="email"></div>
+    <button class="btn primary" type="submit">Recevoir le lien</button></form>`);
+}
+async function sendReset(e){ e.preventDefault(); const btn=e.target.querySelector('[type=submit]');
+  await run(btn,async()=>{ const {error}=await sb.auth.resetPasswordForEmail(e.target.email.value.trim(),{redirectTo:location.origin+location.pathname+'#compte'}); if(error) throw error; closeDrawer(); toast('E-mail envoyé. Pensez à regarder vos courriers indésirables.'); }); }
+function newPassword(){
+  openDrawer('Nouveau mot de passe',`<form onsubmit="App.savePassword(event)"><div class="field"><label for="np">Nouveau mot de passe</label><input id="np" name="pw" type="password" required minlength="6" autocomplete="new-password"></div><button class="btn primary" type="submit">Enregistrer</button></form>`);
+}
+async function savePassword(e){ e.preventDefault(); const btn=e.target.querySelector('[type=submit]');
+  await run(btn,async()=>{ const {error}=await sb.auth.updateUser({password:e.target.pw.value}); if(error) throw error; closeDrawer(); toast('Mot de passe modifié.'); }); }
+async function logout(){ await sb.auth.signOut(); location.hash='#accueil'; }
+async function cancelMine(btn,id){ if(!confirm('Annuler cette réservation ?')) return; await run(btn,async()=>{ chk(await sb.rpc('cancel_reservation',{p_id:id})); await refresh(); toast('Réservation annulée.'); }); }
+function showPay(id){const r=D.myRes.find(x=>x.id===id); if(r) openDrawer('Paiement',payInstructions(r));}
+
+/* ---------- Espace MJ ---------- */
+const mjSess=id=>D.mj.sessions.find(x=>x.id===id);
+const mjRes=id=>D.mj.res.find(x=>x.id===id);
+function mjTotal(r){ const s=mjSess(r.session_id); if(!s) return repasSum(r.repas); if(s.type==='ouverte') return s.prix*r.places+repasSum(r.repas); const o=r.parent_id?mjRes(r.parent_id):r; return s.prix/Math.max(1,o?o.places:1)*partsOf(r)+repasSum(r.repas); }
+function mjTaken(o){ return partsOf(o)+D.mj.res.filter(x=>x.parent_id===o.id&&isActive(x)).reduce((a,x)=>a+partsOf(x),0); }
+function vMJ(){
+  const t=UI.mjTab;
+  const pend=D.mj.res.filter(r=>r.statut==='option'&&isActive(r));
+  const declared=pend.filter(r=>r.paiement_declare).length;
+  const future=D.mj.sessions.filter(s=>s.date>Date.now());
+  const placesConf=D.mj.res.filter(r=>r.statut==='confirmee'&&!r.parent_id&&(mjSess(r.session_id)?.date||0)>Date.now()).reduce((a,r)=>a+Number(r.places),0);
+  const tabs=[['options','Options à valider',pend.length],['reservations','Toutes les réservations'],['planning','Planning'],['scenarios','Scénarios'],['menu','Menu'],['reglages','Réglages']];
+  const body={options:mjOptions,reservations:mjReservations,planning:mjPlanning,scenarios:mjScenarios,menu:mjMenu,reglages:mjReglages}[t]();
+  return `<section style="display:grid;gap:20px">
+    <div class="sec-head"><div><span class="label">Espace MJ</span><h2>Le cabinet du docteur</h2></div><button class="btn small ghost" type="button" onclick="App.reload(this)">Actualiser</button></div>
+    <div class="stats">
+      <div class="stat"><span class="label">Options en attente</span><b>${pend.length}</b></div>
+      <div class="stat"><span class="label">Paiements signalés</span><b style="color:var(--info)">${declared}</b></div>
+      <div class="stat"><span class="label">Parties à venir</span><b>${future.length}</b></div>
+      <div class="stat"><span class="label">Places confirmées</span><b>${placesConf}</b></div>
+    </div>
+    ${!D.settings.paypal?`<div class="box brass"><p>Le lien PayPal n'est pas encore renseigné : les joueurs ne peuvent pas payer en ligne. <button class="btn small" type="button" onclick="App.mjTab('reglages')">Le renseigner</button></p></div>`:''}
+    <div class="tabs" role="tablist">${tabs.map(([k,l,c])=>`<button role="tab" type="button" aria-selected="${t===k}" onclick="App.mjTab('${k}')">${l}${c?`<span class="count num">${c}</span>`:''}</button>`).join('')}</div>
+    <div>${body}</div>
+  </section>`;
+}
+function resRowMJ(r){
+  const s=mjSess(r.session_id); const sc=s?scen(s.scenario_id):null; const u=r.profiles||{pseudo:'?',email:''}; const o=r.parent_id?mjRes(r.parent_id):null; const tot=mjTotal(r);
+  let pl=`<span class="num">${r.places}</span>`;
+  if(s&&s.type==='privatisable'){
+    if(r.parent_id) pl=`<span class="num">${plural(partsOf(r),'part')}</span><div class="sub">Table de ${esc(o?.profiles?.pseudo||'?')}</div>`;
+    else pl=`<span class="num">${r.places} joueurs</span><div class="sub num">${plural(partsOf(r),'part')} · total ${mjTaken(r)}/${r.places}</div>${r.code?`<div class="sub">Code ${esc(r.code)}</div>`:''}`;
+  }
+  const pay=`<button class="btn small primary" type="button" onclick="App.validate(this,'${r.id}','paypal')">PayPal reçu</button><button class="btn small" type="button" onclick="App.validate(this,'${r.id}','especes')">Espèces reçues</button>`;
+  return `<tr><td><b>${esc(u.pseudo)}</b>${r.groupe?`<div class="sub">${esc(r.groupe)}</div>`:''}<div class="sub">${esc(u.email)}</div></td>
+    <td>${s?`${esc(sc?.titre||'?')}<div class="sub">${fDT(s.date)} · ${s.type==='ouverte'?'ouverte':r.parent_id?'rejoint une privatisation':'privatisation'}</div>`:'<span class="sub">Partie supprimée</span>'}</td>
+    <td>${pl}</td><td><span class="sub">${esc(repasLabel(r.repas))}</span>${r.note?`<div class="sub">« ${esc(r.note)} »</div>`:''}</td>
+    <td class="num">${eur(tot)}</td>
+    <td><div class="row">${statusPill({...r,date:s?.date},tot)}</div></td>
+    <td><div class="row">${r.statut==='option'&&isActive(r)?`<button class="btn small" type="button" onclick="App.validate(this,'${r.id}','')">Valider sans paiement</button>${tot>0?pay:''}`:''}${r.statut==='confirmee'&&!r.paye&&tot>0?pay:''}<button class="btn small ghost" type="button" onclick="App.editRes('${r.id}')">Modifier</button></div></td></tr>`;
+}
+const resTable=(rows,emptyMsg)=>rows.length?`<div class="tbl-wrap"><table><thead><tr><th>Joueur</th><th>Partie</th><th>Places</th><th>Repas</th><th>Montant</th><th>Statut</th><th>Actions</th></tr></thead><tbody>${rows.map(resRowMJ).join('')}</tbody></table></div>`:emptyBox(emptyMsg);
+function mjOptions(){
+  const pend=D.mj.res.filter(r=>r.statut==='option'&&isActive(r)).sort((a,b)=>(b.paiement_declare-a.paiement_declare)||(T(a.expires_at)-T(b.expires_at)));
+  return `<div style="display:grid;gap:10px"><p class="muted">Les paiements signalés par les joueurs sont en tête, puis les options qui expirent le plus tôt. « Valider sans paiement » confirme la réservation tout de suite (habitués, règlement sur place) ; vous pourrez noter le paiement plus tard dans « Toutes les réservations ». « PayPal reçu » et « Espèces reçues » confirment et marquent payé.</p>${resTable(pend,'Aucune option en attente.')}</div>`;
+}
+function mjReservations(){
+  const all=D.mj.res.slice().sort((a,b)=>(mjSess(b.session_id)?.date||0)-(mjSess(a.session_id)?.date||0));
+  return `<div style="display:grid;gap:10px"><div class="row" style="justify-content:space-between"><p class="muted">Tout est modifiable : partie, places, parts, repas, statut, échéance, règlement.</p><button class="btn small" type="button" onclick="App.editRes(null)">Ajouter une réservation</button></div>${resTable(all,'Aucune réservation.')}</div>`;
+}
+function localInput(t){const d=new Date(T(t)); return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,16);}
+function editRes(id){
+  const r=id?mjRes(id):{id:null,session_id:D.mj.sessions.find(s=>s.date>Date.now())?.id||D.mj.sessions[0]?.id,user_id:D.mj.profiles[0]?.id,places:1,parts:null,groupe:'',repas:[],note:'',statut:'confirmee',paye:false,moyen:'',expires_at:Date.now()+D.settings.duree_option*HOUR,code:null,parent_id:null};
+  if(!r) return;
+  const sessOpts=D.mj.sessions.slice().sort((a,b)=>b.date-a.date).map(s=>`<option value="${s.id}" ${s.id===r.session_id?'selected':''}>${fShort(s.date)} ${fTime(s.date)} · ${esc(scen(s.scenario_id)?.titre||'?')} (${s.type})</option>`).join('');
+  const qty=id2=>((r.repas||[]).find(x=>x.id===id2)?.qty)||0;
+  const extra=(r.repas||[]).filter(x=>!D.menu.some(m=>m.id===x.id));
+  openDrawer(id?'Modifier la réservation':'Nouvelle réservation',`<form onsubmit="App.saveRes(event,'${id||''}')">
+    <div class="field"><label for="er-u">Joueur</label><select id="er-u" name="user_id">${D.mj.profiles.map(u=>`<option value="${u.id}" ${u.id===r.user_id?'selected':''}>${esc(u.pseudo)} · ${esc(u.email)}</option>`).join('')}</select></div>
+    <div class="field"><label for="er-s">Partie</label><select id="er-s" name="session_id">${sessOpts}</select></div>
+    <div class="fields2"><div class="field"><label for="er-p">Places / joueurs</label><input id="er-p" name="places" type="number" min="1" max="12" value="${r.places}"></div>
+    <div class="field"><label for="er-g">Nom du groupe</label><input id="er-g" name="groupe" type="text" maxlength="80" value="${esc(r.groupe)}"></div></div>
+    <div class="fields2"><div class="field"><label for="er-pa">Parts réglées (privatisation)</label><input id="er-pa" name="parts" type="number" min="0" max="12" value="${r.parts??''}" placeholder="—"></div>
+    ${r.parent_id?`<div class="field"><span class="lbl">Table</span><p class="muted" style="padding:8px 0">Rejoint la table de ${esc(mjRes(r.parent_id)?.profiles?.pseudo||'?')}</p></div>`:`<div class="field"><label for="er-c">Code de table</label><input id="er-c" name="code" type="text" value="${esc(r.code||'')}" maxlength="16" placeholder="Privatisation seulement"></div>`}</div>
+    <div class="field"><span class="lbl">Repas</span>${D.menu.map(m=>`<div class="qty"><span class="n">${esc(m.nom)}<small>${eur(m.prix)}${m.dispo?'':' · retiré du menu'}</small></span><input type="number" min="0" max="30" name="q-${m.id}" value="${qty(m.id)}" aria-label="Quantité ${esc(m.nom)}"></div>`).join('')}${extra.length?`<p class="note">Plats supprimés du menu, conservés : ${esc(repasLabel(extra))}</p>`:''}</div>
+    <div class="fields2"><div class="field"><label for="er-st">Statut</label><select id="er-st" name="statut">${[['option','Option'],['confirmee','Confirmée'],['annulee','Annulée'],['expiree','Expirée']].map(([k,l])=>`<option value="${k}" ${r.statut===k?'selected':''}>${l}</option>`).join('')}</select></div>
+    <div class="field"><label for="er-x">Fin de l'option</label><input id="er-x" name="expires_at" type="datetime-local" value="${localInput(r.expires_at)}"></div></div>
+    <div class="field"><label for="er-m">Règlement</label><select id="er-m" name="moyen"><option value="" ${!r.paye?'selected':''}>Pas encore réglé</option><option value="paypal" ${r.paye&&r.moyen!=='especes'?'selected':''}>Réglé par PayPal</option><option value="especes" ${r.paye&&r.moyen==='especes'?'selected':''}>Réglé en espèces</option></select></div>
+    <div class="field"><label for="er-n">Note</label><textarea id="er-n" name="note" maxlength="1000">${esc(r.note)}</textarea></div>
+    <div class="row"><button class="btn primary" type="submit">Enregistrer</button>${id?`<button class="btn small ghost" type="button" onclick="App.extend(this,'${id}')">+24 h d'option</button><button class="btn danger" type="button" onclick="App.delRes(this,'${id}')">Supprimer</button>`:''}</div>
+  </form>`);
+}
+async function saveRes(e,id){
+  e.preventDefault(); const f=e.target; const btn=f.querySelector('[type=submit]'); const old=id?mjRes(id):null;
+  const repas=[]; D.menu.forEach(m=>{const q=Math.round(+f['q-'+m.id].value||0); if(q>0){const prev=(old?.repas||[]).find(x=>x.id===m.id); repas.push({id:m.id,nom:m.nom,prix:prev?prev.prix:m.prix,qty:Math.min(30,q)});}});
+  (old?.repas||[]).filter(x=>!D.menu.some(m=>m.id===x.id)).forEach(x=>repas.push(x));
+  const moyen=f.moyen.value;
+  const patch={user_id:f.user_id.value,session_id:f.session_id.value,places:Math.max(1,+f.places.value||1),parts:f.parts.value===''?null:Math.max(0,+f.parts.value),groupe:f.groupe.value.trim(),repas,statut:f.statut.value,
+    expires_at:new Date(f.expires_at.value||Date.now()).toISOString(),paye:!!moyen,moyen,note:f.note.value.trim()};
+  if(f.code) patch.code=f.code.value.trim()?f.code.value.trim().toUpperCase().replace(/\s+/g,'-'):null;
+  await run(btn,async()=>{
+    if(id){ chk(await sb.from('reservations').update(patch).eq('id',id));
+      if(old&&old.session_id!==patch.session_id) chk(await sb.from('reservations').update({session_id:patch.session_id}).eq('parent_id',id)); }
+    else chk(await sb.from('reservations').insert(patch));
+    await refresh(); closeDrawer(); toast('Réservation enregistrée.');
+  });
+}
+async function validate(btn,id,moyen){ const patch={statut:'confirmee'}; if(moyen){patch.paye=true; patch.moyen=moyen;}
+  await run(btn,async()=>{ chk(await sb.from('reservations').update(patch).eq('id',id)); await refresh(); toast(moyen?(moyen==='especes'?'Confirmée, réglée en espèces.':'Confirmée, réglée par PayPal.'):'Réservation validée sans paiement.'); }); }
+async function extend(btn,id){ const r=mjRes(id); const exp=new Date(Math.max(T(r.expires_at),Date.now())+24*HOUR).toISOString();
+  await run(btn,async()=>{ chk(await sb.from('reservations').update({expires_at:exp,statut:r.statut==='expiree'?'option':r.statut}).eq('id',id)); await refresh(); editRes(id); toast('Option prolongée de 24 h.'); }); }
+async function delRes(btn,id){ const n=D.mj.res.filter(x=>x.parent_id===id).length; if(!confirm(n?`Supprimer cette réservation et les ${n} ami(s) qui ont rejoint la table ?`:'Supprimer cette réservation ?')) return;
+  await run(btn,async()=>{ chk(await sb.from('reservations').delete().eq('id',id)); await refresh(); closeDrawer(); toast('Réservation supprimée.'); }); }
+
+function mjPlanning(){
+  const list=D.mj.sessions.slice().sort((a,b)=>a.date-b.date);
+  const fut=list.filter(s=>s.date>=Date.now()-3*HOUR), past=list.filter(s=>s.date<Date.now()-3*HOUR).reverse();
+  const row=s=>`<tr><td class="num">${fShort(s.date)}<div class="sub">${fTime(s.date)}</div></td><td>${esc(scen(s.scenario_id)?.titre||'?')}${s.note?`<div class="sub">${esc(s.note)}</div>`:''}</td><td>${s.type==='ouverte'?'Ouverte':'Privatisable'}</td><td>${s.type==='ouverte'?`<span class="num">${s.pris} / ${s.places}</span>`:s.group_size?`<span class="num">${s.parts_taken} / ${s.group_size} parts</span>`:''} ${sessPill(s)}</td><td class="num">${eur(s.prix)}</td>
+    <td><div class="row"><button class="btn small ghost" type="button" onclick="App.editSess('${s.id}')">Modifier</button><button class="btn small ghost" type="button" onclick="App.dupSess(this,'${s.id}')">+7 j</button></div></td></tr>`;
+  const head='<thead><tr><th>Date</th><th>Scénario</th><th>Formule</th><th>Remplissage</th><th>Prix</th><th>Actions</th></tr></thead>';
+  return `<div style="display:grid;gap:10px"><div class="row" style="justify-content:space-between"><p class="muted">« +7 j » recopie une partie à la semaine suivante, pour remplir le planning vite.</p><button class="btn primary small" type="button" onclick="App.editSess(null)" ${D.scenarios.length?'':'disabled title="Ajoutez d\'abord un scénario"'}>Ajouter une partie</button></div>
+  ${!D.scenarios.length?'<p class="note">Ajoutez d\'abord un scénario dans l\'onglet Scénarios.</p>':''}
+  ${fut.length?`<div class="tbl-wrap"><table>${head}<tbody>${fut.map(row).join('')}</tbody></table></div>`:emptyBox('Aucune partie à venir.')}
+  ${past.length?`<details><summary class="label" style="cursor:pointer">Parties passées (${past.length})</summary><div class="tbl-wrap" style="margin-top:10px"><table>${head}<tbody>${past.map(row).join('')}</tbody></table></div></details>`:''}</div>`;
+}
+function editSess(id){
+  const s=id?mjSess(id):{date:Date.now()+7*DAY,scenario_id:D.scenarios[0]?.id,type:'ouverte',places:6,prix:15,note:''};
+  const d=new Date(s.date); const pad=n=>String(n).padStart(2,'0');
+  const ds=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`, ts=id?`${pad(d.getHours())}:${pad(d.getMinutes())}`:'20:00';
+  const nRes=id?D.mj.res.filter(r=>r.session_id===id&&isActive(r)).length:0;
+  openDrawer(id?'Modifier la partie':'Nouvelle partie',`<form onsubmit="App.saveSess(event,'${id||''}')">
+    <div class="fields2"><div class="field"><label for="es-d">Date</label><input id="es-d" name="d" type="date" value="${ds}" required></div><div class="field"><label for="es-t">Heure</label><input id="es-t" name="t" type="time" value="${ts}" required></div></div>
+    <div class="field"><label for="es-sc">Scénario</label><select id="es-sc" name="scenario_id">${D.scenarios.map(x=>`<option value="${x.id}" ${x.id===s.scenario_id?'selected':''}>${esc(x.titre)}</option>`).join('')}</select></div>
+    <div class="fields2"><div class="field"><label for="es-ty">Formule</label><select id="es-ty" name="type"><option value="ouverte" ${s.type==='ouverte'?'selected':''}>Partie ouverte (à la place)</option><option value="privatisable" ${s.type==='privatisable'?'selected':''}>Privatisable (la table)</option></select></div>
+    <div class="field"><label for="es-p">Places</label><input id="es-p" name="places" type="number" min="1" max="12" value="${s.places}"></div></div>
+    <div class="field"><label for="es-px">Prix (€, par place si ouverte, par table si privatisable)</label><input id="es-px" name="prix" type="number" min="0" step="0.5" value="${s.prix}"></div>
+    <div class="field"><label for="es-n">Note visible des joueurs</label><input id="es-n" name="note" type="text" value="${esc(s.note)}"></div>
+    ${nRes?`<p class="note">${nRes} réservation(s) active(s) sur cette partie.</p>`:''}
+    <div class="row"><button class="btn primary" type="submit">Enregistrer</button>${id?`<button class="btn danger" type="button" onclick="App.delSess(this,'${id}')">Supprimer la partie</button>`:''}</div>
+  </form>`);
+}
+async function saveSess(e,id){
+  e.preventDefault(); const f=e.target; const btn=f.querySelector('[type=submit]');
+  const [y,mo,da]=f.d.value.split('-').map(Number); const [h,mi]=f.t.value.split(':').map(Number);
+  const data={date:new Date(y,mo-1,da,h,mi).toISOString(),scenario_id:f.scenario_id.value,type:f.type.value,places:Math.max(1,+f.places.value||1),prix:Math.max(0,+f.prix.value||0),note:f.note.value.trim()};
+  await run(btn,async()=>{ if(id) chk(await sb.from('sessions').update(data).eq('id',id)); else chk(await sb.from('sessions').insert(data)); await refresh(); closeDrawer(); toast('Planning mis à jour.'); });
+}
+async function dupSess(btn,id){ const s=mjSess(id);
+  await run(btn,async()=>{ chk(await sb.from('sessions').insert({date:new Date(s.date+7*DAY).toISOString(),scenario_id:s.scenario_id,type:s.type,places:s.places,prix:s.prix,note:s.note})); await refresh(); toast('Partie recopiée au '+fShort(s.date+7*DAY)+'.'); }); }
+async function delSess(btn,id){ const n=D.mj.res.filter(r=>r.session_id===id).length; if(!confirm(n?`Supprimer cette partie et ses ${n} réservation(s) ?`:'Supprimer cette partie ?')) return;
+  await run(btn,async()=>{ chk(await sb.from('sessions').delete().eq('id',id)); await refresh(); closeDrawer(); toast('Partie supprimée.'); }); }
+
+function mjScenarios(){
+  return `<div style="display:grid;gap:10px"><div class="row" style="justify-content:space-between"><p class="muted">${plural(D.scenarios.length,'scénario')} au catalogue.</p><button class="btn primary small" type="button" onclick="App.editScen(null)">Ajouter un scénario</button></div>
+  ${D.scenarios.length?`<div class="tbl-wrap"><table><thead><tr><th>Titre</th><th>Système</th><th>Joueurs</th><th>Image</th><th></th></tr></thead><tbody>
+  ${D.scenarios.map(s=>`<tr><td><b>${esc(s.titre)}</b><div class="sub">${esc(s.accroche)}</div></td><td>${esc(s.systeme)}</td><td class="num">${s.min_joueurs}–${s.max_joueurs}</td><td>${s.image_url?'Oui':'—'}</td><td><button class="btn small ghost" type="button" onclick="App.editScen('${s.id}')">Modifier</button></td></tr>`).join('')}
+  </tbody></table></div>`:emptyBox('Aucun scénario pour l\'instant. Commencez par en ajouter un.')}</div>`;
+}
+let pendingImg='';
+function editScen(id){
+  const s=id?scen(id):{titre:'',systeme:'',duree:'4 h',min_joueurs:3,max_joueurs:6,ambiance:'',niveau:'Tous niveaux',accroche:'',description:'',avert:'',modes:['ouverte','privatisable'],pj:'Prétirés fournis',image_url:''};
+  pendingImg=s.image_url||'';
+  const inp=(k,l,type='text',extra='')=>`<div class="field"><label for="esc-${k}">${l}</label><input id="esc-${k}" name="${k}" type="${type}" value="${esc(s[k])}" ${extra}></div>`;
+  openDrawer(id?'Modifier le scénario':'Nouveau scénario',`<form onsubmit="App.saveScen(event,'${id||''}')">
+    <div class="field img-edit"><span class="lbl">Image d'illustration</span>
+      <div id="esc-img-prev">${imgSlot(pendingImg,'Aperçu')}</div>
+      <div class="row"><label class="btn small" for="esc-img">Choisir une image</label><input id="esc-img" type="file" accept="image/*" class="sr" onchange="App.pickImg(this)"><button class="btn small ghost" type="button" onclick="App.clearImg()">Retirer l'image</button></div>
+      <p class="note">Format paysage conseillé (16:9). L'image est recadrée automatiquement.</p></div>
+    ${inp('titre','Titre','text','required maxlength="120"')}
+    <div class="fields2">${inp('systeme','Système de jeu')}${inp('duree','Durée')}</div>
+    <div class="fields2">${inp('min_joueurs','Joueurs min.','number','min="1" max="12"')}${inp('max_joueurs','Joueurs max.','number','min="1" max="12"')}</div>
+    <div class="fields2">${inp('ambiance','Ambiance')}${inp('niveau','Niveau')}</div>
+    ${inp('pj','Personnages')}
+    <div class="field"><label for="esc-acc">Accroche (une phrase)</label><textarea id="esc-acc" name="accroche" style="min-height:60px">${esc(s.accroche)}</textarea></div>
+    <div class="field"><label for="esc-desc">Présentation complète</label><textarea id="esc-desc" name="description" style="min-height:140px">${esc(s.description)}</textarea></div>
+    ${inp('avert','Thèmes sensibles')}
+    <div class="row"><button class="btn primary" type="submit">Enregistrer</button>${id?`<button class="btn danger" type="button" onclick="App.delScen(this,'${id}')">Retirer du catalogue</button>`:''}</div>
+  </form>`);
+}
+function pickImg(input){
+  const file=input.files&&input.files[0]; if(!file) return;
+  if(!file.type.startsWith('image/')){toast('Ce fichier n\'est pas une image.');return;}
+  const url=URL.createObjectURL(file); const im=new Image();
+  im.onload=()=>{const W=1200,H=675; const c=document.createElement('canvas'); c.width=W; c.height=H; const g=c.getContext('2d');
+    const sc=Math.max(W/im.width,H/im.height); const w=im.width*sc,h=im.height*sc; g.drawImage(im,(W-w)/2,(H-h)/2,w,h);
+    pendingImg=c.toDataURL('image/jpeg',0.84); URL.revokeObjectURL(url); $('#esc-img-prev').innerHTML=imgSlot(pendingImg,'Aperçu');};
+  im.onerror=()=>{toast('Impossible de lire cette image.');URL.revokeObjectURL(url);};
+  im.src=url;
+}
+function clearImg(){pendingImg=''; $('#esc-img-prev').innerHTML=imgSlot('','Aperçu');}
+async function uploadImg(dataUrl){
+  const blob=await (await fetch(dataUrl)).blob(); const path=(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36))+'.jpg';
+  chk(await sb.storage.from('scenarios').upload(path,blob,{contentType:'image/jpeg',upsert:false}));
+  return sb.storage.from('scenarios').getPublicUrl(path).data.publicUrl;
+}
+async function saveScen(e,id){
+  e.preventDefault(); const f=e.target; const btn=f.querySelector('[type=submit]');
+  const min=Math.max(1,+f.min_joueurs.value||1), max=Math.max(min,+f.max_joueurs.value||min);
+  await run(btn,async()=>{
+    let image_url=pendingImg; if(image_url.startsWith('data:')) image_url=await uploadImg(image_url);
+    const data={titre:f.titre.value.trim(),systeme:f.systeme.value.trim(),duree:f.duree.value.trim(),min_joueurs:min,max_joueurs:max,ambiance:f.ambiance.value.trim(),niveau:f.niveau.value.trim(),pj:f.pj.value.trim(),accroche:f.accroche.value.trim(),description:f.description.value.trim(),avert:f.avert.value.trim(),image_url};
+    if(id) chk(await sb.from('scenarios').update(data).eq('id',id)); else chk(await sb.from('scenarios').insert(data));
+    await refresh(); closeDrawer(); toast('Catalogue mis à jour.');
+  });
+}
+async function delScen(btn,id){ if(D.mj.sessions.some(s=>s.scenario_id===id)){toast('Ce scénario a des parties au planning : supprimez-les ou changez leur scénario d\'abord.');return;}
+  if(!confirm('Retirer ce scénario du catalogue ?')) return;
+  await run(btn,async()=>{ chk(await sb.from('scenarios').delete().eq('id',id)); await refresh(); closeDrawer(); toast('Scénario retiré.'); }); }
+
+function mjMenu(){
+  return `<div style="display:grid;gap:10px"><div class="row" style="justify-content:space-between"><p class="muted">Un plat décoché disparaît des réservations sans toucher aux commandes passées.</p><button class="btn primary small" type="button" onclick="App.editMenu(null)">Ajouter un plat</button></div>
+  ${D.menu.length?`<div class="tbl-wrap"><table><thead><tr><th>Plat</th><th>Prix</th><th>Proposé</th><th></th></tr></thead><tbody>
+  ${D.menu.map(m=>`<tr><td><b>${esc(m.nom)}</b><div class="sub">${esc(m.descr)}</div></td><td class="num">${eur(m.prix)}</td><td><input type="checkbox" aria-label="Proposer ${esc(m.nom)}" ${m.dispo?'checked':''} onchange="App.toggleMenu(this,'${m.id}')"></td><td><button class="btn small ghost" type="button" onclick="App.editMenu('${m.id}')">Modifier</button></td></tr>`).join('')}
+  </tbody></table></div>`:emptyBox('Aucun plat pour l\'instant.')}</div>`;
+}
+function editMenu(id){
+  const m=id?D.menu.find(x=>x.id===id):{nom:'',descr:'',prix:10,dispo:true,position:D.menu.length};
+  openDrawer(id?'Modifier le plat':'Nouveau plat',`<form onsubmit="App.saveMenu(event,'${id||''}')">
+    <div class="field"><label for="em-n">Nom</label><input id="em-n" name="nom" type="text" value="${esc(m.nom)}" required maxlength="80"></div>
+    <div class="field"><label for="em-d">Description</label><input id="em-d" name="descr" type="text" value="${esc(m.descr)}" maxlength="160"></div>
+    <div class="fields2"><div class="field"><label for="em-p">Prix (€)</label><input id="em-p" name="prix" type="number" min="0" step="0.5" value="${m.prix}"></div>
+    <div class="field"><label for="em-o">Ordre d'affichage</label><input id="em-o" name="position" type="number" value="${m.position||0}"></div></div>
+    <label class="check"><input type="checkbox" name="dispo" ${m.dispo?'checked':''}> Proposé à la réservation</label>
+    <div class="row"><button class="btn primary" type="submit">Enregistrer</button>${id?`<button class="btn danger" type="button" onclick="App.delMenu(this,'${id}')">Supprimer</button>`:''}</div></form>`);
+}
+async function saveMenu(e,id){ e.preventDefault(); const f=e.target; const btn=f.querySelector('[type=submit]');
+  const data={nom:f.nom.value.trim(),descr:f.descr.value.trim(),prix:Math.max(0,+f.prix.value||0),dispo:f.dispo.checked,position:Math.round(+f.position.value||0)};
+  await run(btn,async()=>{ if(id) chk(await sb.from('menu_items').update(data).eq('id',id)); else chk(await sb.from('menu_items').insert(data)); await refresh(); closeDrawer(); toast('Menu mis à jour.'); }); }
+async function toggleMenu(cb,id){ const m=D.menu.find(x=>x.id===id); await run(null,async()=>{ chk(await sb.from('menu_items').update({dispo:!m.dispo}).eq('id',id)); await refresh(); }); }
+async function delMenu(btn,id){ if(!confirm('Supprimer ce plat ? Les commandes déjà passées le gardent.')) return; await run(btn,async()=>{ chk(await sb.from('menu_items').delete().eq('id',id)); await refresh(); closeDrawer(); toast('Plat supprimé.'); }); }
+
+function mjReglages(){
+  const st=D.settings;
+  return `<form class="card" style="max-width:640px" onsubmit="App.saveSettings(event)">
+    <div class="field"><label for="st-p">Lien PayPal.me</label><input id="st-p" name="paypal" type="url" placeholder="https://paypal.me/votre-nom" value="${esc(st.paypal)}"></div>
+    <div class="field"><label for="st-d">Durée d'une option (heures)</label><input id="st-d" name="duree" type="number" min="1" max="168" value="${st.duree_option}"></div>
+    <div class="field"><label for="st-a">Adresse de la salle (pied de page)</label><input id="st-a" name="adresse" type="text" value="${esc(st.adresse)}"></div>
+    <div class="row"><button class="btn primary" type="submit">Enregistrer</button></div></form>`;
+}
+async function saveSettings(e){ e.preventDefault(); const f=e.target; const btn=f.querySelector('[type=submit]');
+  await run(btn,async()=>{ chk(await sb.from('settings').update({paypal:f.paypal.value.trim(),duree_option:Math.min(168,Math.max(1,Math.round(+f.duree.value||48))),adresse:f.adresse.value.trim()}).eq('id',1)); await refresh(); toast('Réglages enregistrés.'); }); }
+
+/* ---------- Démarrage ---------- */
+window.App={planFilter(k){UI.planFilter=k;render();}, scenFilter(k){UI.scenFilter=k;render();}, mjTab(k){UI.mjTab=k;render();},
+  reload(btn){run(btn,refresh);},
+  openSession,openScenario,closeDrawer,updateTotal,book,declarePaid,toggleDone,signup,login,forgot,sendReset,savePassword,logout,cancelMine,showPay,
+  openJoin,joinLookup,joinTotal,joinSubmit,copyCode,
+  validate,editRes,saveRes,extend,delRes,editSess,saveSess,dupSess,delSess,editScen,saveScen,delScen,pickImg,clearImg,editMenu,saveMenu,toggleMenu,delMenu,saveSettings};
+
+let first=true;
+sb.auth.onAuthStateChange((ev,session)=>{
+  const was=D.user?.id; D.user=session?.user||null;
+  if(ev==='PASSWORD_RECOVERY') setTimeout(newPassword,300);
+  if(first||was!==D.user?.id){ first=false; setTimeout(refresh,0); }
+});
+// Rafraîchit le planning toutes les 2 minutes (places libres, expirations)
+setInterval(()=>{ if(!document.hidden && !$('#drawer').classList.contains('open')) refresh(); },120000);
+})();
+</script>
+</body>
+</html>
