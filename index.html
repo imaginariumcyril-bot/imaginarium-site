@@ -309,7 +309,7 @@ function errMsg(e){
 async function loadPublic(){
   const [st,sc,pl,mn]=await Promise.all([
     sb.from('settings').select('*').eq('id',1).maybeSingle(),
-    sb.from('scenarios').select('*').order('titre'),
+    sb.from('scenarios').select('*').order('position').order('titre'),
     sb.rpc('get_planning'),
     sb.from('menu_items').select('*').order('position').order('nom')]);
   D.settings=chk(st)||D.settings; D.scenarios=chk(sc)||[]; D.planning=(chk(pl)||[]).map(normS);
@@ -364,6 +364,7 @@ function sessPill(s){
   if(s.type==='ouverte') return s.libres>0?`<span class="pill info num">${s.libres} place${s.libres>1?'s':''} libre${s.libres>1?'s':''}</span>`:'<span class="pill bad">Complet</span>';
   return {libre:'<span class="pill brass">Libre à privatiser</span>',option:'<span class="pill warn">Option en cours</span>',reservee:'<span class="pill mute">Privatisée</span>'}[sessState(s)];
 }
+const PRIV_MIN=3; const privMin=sc=>Math.max(PRIV_MIN,sc.min_joueurs||1);
 const CODE_CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const genCode=()=>'NOIR-'+Array.from({length:4},()=>CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)]).join('');
 
@@ -480,7 +481,7 @@ function openSession(id){
   const s=D.planning.find(x=>x.id===id); if(!s){toast('Cette partie n\'est plus au planning.');return;}
   const sc=scen(s.scenario_id)||{titre:'?',min_joueurs:1,max_joueurs:6,systeme:'',duree:''};
   const mineRes=D.myRes.filter(r=>r.session_id===id&&r.active);
-  let html=`<dl class="facts"><dt>Date</dt><dd>${fDate(s.date)} à ${fTime(s.date)}</dd>${sc.systeme?`<dt>Système</dt><dd>${esc(sc.systeme)}</dd>`:''}${sc.duree?`<dt>Durée</dt><dd>${esc(sc.duree)}</dd>`:''}<dt>Formule</dt><dd>${s.type==='ouverte'?`Partie ouverte · ${eur(s.prix)} la place`:`Privatisation · ${eur(s.prix)} par joueur (${sc.min_joueurs} à ${sc.max_joueurs} joueurs)`}</dd><dt>Disponibilité</dt><dd>${sessPill(s)}</dd>${s.note?`<dt>Note</dt><dd>${esc(s.note)}</dd>`:''}</dl>
+  let html=`<dl class="facts"><dt>Date</dt><dd>${fDate(s.date)} à ${fTime(s.date)}</dd>${sc.systeme?`<dt>Système</dt><dd>${esc(sc.systeme)}</dd>`:''}${sc.duree?`<dt>Durée</dt><dd>${esc(sc.duree)}</dd>`:''}<dt>Formule</dt><dd>${s.type==='ouverte'?`Partie ouverte · ${eur(s.prix)} la place`:`Privatisation · ${eur(s.prix)} par joueur (${privMin(sc)} à ${sc.max_joueurs} joueurs)`}</dd><dt>Disponibilité</dt><dd>${sessPill(s)}</dd>${s.note?`<dt>Note</dt><dd>${esc(s.note)}</dd>`:''}</dl>
   ${sc.accroche?`<p class="prose">${esc(sc.accroche)}</p>`:''}<div class="row"><button class="btn small ghost" type="button" onclick="App.openScenario('${sc.id}')">Lire la fiche du scénario</button></div>`;
   if(mineRes.length) html+=mineRes.map(r=>`<div class="box brass"><div class="row">${statusPill(r,totalMine(r))}</div><p>${s.type==='ouverte'?'Vous avez déjà '+plural(r.places,'place')+' sur cette partie.':r.parent_id?'Vous avez rejoint cette table privatisée.':'Vous avez privatisé cette table.'}</p><a class="btn small" href="#compte" onclick="App.closeDrawer()">Voir dans mon compte</a></div>`).join('');
   const bookable=sessState(s)==='libre';
@@ -515,7 +516,8 @@ function repasFormTotal(f,prefix='q'){let t=0; D.menu.forEach(m=>{const q=f[pref
   readFormules(f).forEach(x=>{const m=D.menu.find(y=>y.id===x.id); if(m) t+=formulePrix(m,x.choix.length);}); return t;}
 function bookingForm(s,sc){
   const priv=s.type==='privatisable';
-  const opts=priv?Array.from({length:sc.max_joueurs-sc.min_joueurs+1},(_,i)=>sc.min_joueurs+i):Array.from({length:s.libres},(_,i)=>i+1);
+  const pmin=privMin(sc); const opts=priv?Array.from({length:Math.max(0,sc.max_joueurs-pmin+1)},(_,i)=>pmin+i):Array.from({length:s.libres},(_,i)=>i+1);
+  if(priv&&!opts.length) return `<div class="box"><p>Ce scénario se joue à moins de ${PRIV_MIN} joueurs : il ne peut pas être privatisé. Contactez le MJ.</p></div>`;
   const def=priv?sc.max_joueurs:1;
   return `<form id="book" onsubmit="App.book(event,'${s.id}')" oninput="App.updateTotal()">
     <h3>${priv?'Poser une option de privatisation':'Réserver des places'}</h3>
@@ -881,10 +883,16 @@ async function delSess(btn,id){ const n=D.mj.res.filter(r=>r.session_id===id).le
   await run(btn,async()=>{ chk(await sb.from('sessions').delete().eq('id',id)); await refresh(); closeDrawer(); toast('Partie supprimée.'); }); }
 
 function mjScenarios(){
-  return `<div style="display:grid;gap:10px"><div class="row" style="justify-content:space-between"><p class="muted">${plural(D.scenarios.length,'scénario')} au catalogue.</p><button class="btn primary small" type="button" onclick="App.editScen(null)">Ajouter un scénario</button></div>
-  ${D.scenarios.length?`<div class="tbl-wrap"><table><thead><tr><th>Titre</th><th>Système</th><th>Joueurs</th><th>Image</th><th></th></tr></thead><tbody>
-  ${D.scenarios.map(s=>`<tr><td><b>${esc(s.titre)}</b><div class="sub">${esc(s.accroche)}</div></td><td>${esc(s.systeme)}</td><td class="num">${s.min_joueurs}–${s.max_joueurs}</td><td>${s.image_url?'Oui':'—'}</td><td><button class="btn small ghost" type="button" onclick="App.editScen('${s.id}')">Modifier</button></td></tr>`).join('')}
+  return `<div style="display:grid;gap:10px"><div class="row" style="justify-content:space-between"><p class="muted">${plural(D.scenarios.length,'scénario')} au catalogue. Les flèches règlent l'ordre d'affichage pour les joueurs.</p><button class="btn primary small" type="button" onclick="App.editScen(null)">Ajouter un scénario</button></div>
+  ${D.scenarios.length?`<div class="tbl-wrap"><table><thead><tr><th>Ordre</th><th>Titre</th><th>Système</th><th>Joueurs</th><th>Image</th><th></th></tr></thead><tbody>
+  ${D.scenarios.map((s,i)=>`<tr><td><div class="row" style="flex-wrap:nowrap;gap:4px"><button class="btn small ghost" type="button" aria-label="Monter ${esc(s.titre)}" ${i===0?'disabled':''} onclick="App.moveScen(this,'${s.id}',-1)">↑</button><button class="btn small ghost" type="button" aria-label="Descendre ${esc(s.titre)}" ${i===D.scenarios.length-1?'disabled':''} onclick="App.moveScen(this,'${s.id}',1)">↓</button></div></td><td><b>${esc(s.titre)}</b><div class="sub">${esc(s.accroche)}</div></td><td>${esc(s.systeme)}</td><td class="num">${s.min_joueurs}–${s.max_joueurs}</td><td>${s.image_url?'Oui':'—'}</td><td><button class="btn small ghost" type="button" onclick="App.editScen('${s.id}')">Modifier</button></td></tr>`).join('')}
   </tbody></table></div>`:emptyBox('Aucun scénario pour l\'instant. Commencez par en ajouter un.')}</div>`;
+}
+async function moveScen(btn,id,dir){
+  const list=D.scenarios.slice(); const i=list.findIndex(x=>x.id===id); const j=i+dir; if(j<0||j>=list.length) return;
+  [list[i],list[j]]=[list[j],list[i]]; D.scenarios=list; render();
+  await run(null,async()=>{ const ch=list.map((x,k)=>({x,k:k+1})).filter(({x,k})=>x.position!==k);
+    await Promise.all(ch.map(({x,k})=>sb.from('scenarios').update({position:k}).eq('id',x.id).then(chk))); await refresh(); });
 }
 let pendingImg='';
 function editScen(id){
@@ -929,7 +937,7 @@ async function saveScen(e,id){
   await run(btn,async()=>{
     let image_url=pendingImg; if(image_url.startsWith('data:')) image_url=await uploadImg(image_url);
     const data={titre:f.titre.value.trim(),systeme:f.systeme.value.trim(),duree:f.duree.value.trim(),min_joueurs:min,max_joueurs:max,ambiance:f.ambiance.value.trim(),niveau:f.niveau.value.trim(),pj:f.pj.value.trim(),accroche:f.accroche.value.trim(),description:f.description.value.trim(),avert:f.avert.value.trim(),image_url};
-    if(id) chk(await sb.from('scenarios').update(data).eq('id',id)); else chk(await sb.from('scenarios').insert(data));
+    if(id) chk(await sb.from('scenarios').update(data).eq('id',id)); else chk(await sb.from('scenarios').insert({...data,position:Math.max(0,...D.scenarios.map(x=>x.position||0))+1}));
     await refresh(); closeDrawer(); toast('Catalogue mis à jour.');
   });
 }
@@ -993,7 +1001,7 @@ window.App={planFilter(k){UI.planFilter=k;render();}, scenFilter(k){UI.scenFilte
   reload(btn){run(btn,refresh);},
   openSession,openScenario,closeDrawer,updateTotal,book,declarePaid,toggleDone,signup,login,forgot,sendReset,savePassword,logout,cancelMine,showPay,
   openJoin,joinLookup,joinTotal,joinSubmit,copyCode,
-  validate,editRes,saveRes,extend,delRes,editSess,saveSess,dupSess,delSess,editScen,saveScen,delScen,pickImg,clearImg,editMenu,saveMenu,addFormule,formuleCount,removeFormule,toggleMenu,delMenu,saveSettings};
+  validate,editRes,saveRes,extend,delRes,editSess,saveSess,dupSess,delSess,editScen,saveScen,delScen,moveScen,pickImg,clearImg,editMenu,saveMenu,addFormule,formuleCount,removeFormule,toggleMenu,delMenu,saveSettings};
 
 let first=true;
 sb.auth.onAuthStateChange((ev,session)=>{
