@@ -128,7 +128,7 @@ main{max-width:1120px;margin:0 auto;padding:28px 16px 80px;display:grid;gap:40px
 
 /* Scénarios */
 .scen-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
-.scen{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px 18px 14px;display:grid;gap:8px;align-content:start;cursor:pointer;text-align:left;width:100%}
+.scen{display:flex!important;flex-direction:column;position:relative;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px 18px 14px;display:grid;gap:8px;align-content:start;cursor:pointer;text-align:left;width:100%}
 .scen:hover{background:var(--panel-2)}
 .scen.done{border-color:#3f5a3b}
 .scen .sys{font-family:var(--f-label);font-size:.7rem;color:var(--brass);letter-spacing:.12em;text-transform:uppercase;margin-top:-4px}
@@ -148,7 +148,7 @@ main{max-width:1120px;margin:0 auto;padding:28px 16px 80px;display:grid;gap:40px
 .date-btn:hover{border-color:var(--brass-deep);background:var(--panel-2)}
 .d-info{color:var(--info);font-size:.85rem;white-space:nowrap}
 .d-brass{color:var(--brass);font-size:.85rem;white-space:nowrap}
-.tick{position:absolute;top:12px;right:12px;z-index:1;display:flex;align-items:center;gap:8px;background:none;border:0;padding:2px;cursor:pointer;color:var(--ok)}
+.tick{position:static;align-self:flex-end;margin-top:auto;padding-top:12px!important;z-index:1;display:flex;align-items:center;gap:8px;background:none;border:0;padding:2px;cursor:pointer;color:var(--ok)}
 .tick .tbox{width:24px;height:24px;border-radius:4px;border:1.5px solid var(--muted);background:rgba(11,10,8,.6);display:grid;place-items:center;flex:none}
 .tick:hover .tbox{border-color:var(--bone)}
 .tick[aria-checked="true"] .tbox{background:var(--ok);border-color:var(--ok)}
@@ -162,7 +162,7 @@ main{max-width:1120px;margin:0 auto;padding:28px 16px 80px;display:grid;gap:40px
 .tick .played.todo::before,.tick .played.todo::after{background:var(--warn)}
 @keyframes stamp{from{opacity:0;transform:scale(1.25) rotate(-4deg)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion: reduce){.tick[aria-checked="true"] .played{animation:none}}
-.scen.has-tick{padding-top:50px}
+
 .tick svg{display:block}
 .progress{height:6px;background:var(--panel-2);border-radius:999px;overflow:hidden}
 .progress b{display:block;height:100%;background:var(--ok)}
@@ -649,16 +649,15 @@ function imgSlot(src,alt){
 function scenCard(s){
   const u=D.profile; const done=u&&D.done.has(s.id);
   const dispo=D.planning.filter(x=>accueille(x,s.id)&&x.type==='ouverte'&&x.date>Date.now()&&x.libres>0);
-  const shown=dispo.slice(0,3);
-  return `<div class="scen ${done?'done':''} ${u&&!s.image_url?'has-tick':''}" role="button" tabindex="0" onclick="App.openScenario('${s.id}')" onkeydown="if(event.key==='Enter')App.openScenario('${s.id}')">
-    ${u?`<button type="button" class="tick" role="checkbox" aria-checked="${!!done}" aria-label="Déjà joué : ${esc(s.titre)}" onclick="event.stopPropagation();App.toggleDone('${s.id}')"><span class="played" aria-hidden="true">Déjà joué</span><span class="played todo" aria-hidden="true">À faire</span><span class="tbox">${check}</span></button>`:''}
-    ${s.image_url?`<div class="scen-thumb"><img src="${esc(s.image_url)}" alt="" loading="lazy"></div>`:''}
+  const next=dispo[0];
+  return `<div class="scen ${done?'done':''} " role="button" tabindex="0" onclick="App.openScenario('${s.id}')" onkeydown="if(event.key==='Enter')App.openScenario('${s.id}')">
+        ${s.image_url?`<div class="scen-thumb"><img src="${esc(s.image_url)}" alt="" loading="lazy"></div>`:''}
     <h3>${esc(s.titre)}</h3>${s.systeme||s.genre==='campagne'?`<span class="sys">${s.genre==='campagne'?'Campagne':''}${s.genre==='campagne'&&s.systeme?' · ':''}${esc(s.systeme)}</span>`:''}${s.accroche?`<p>${esc(s.accroche)}</p>`:''}
     <div class="foot">${s.duree?`<span>${esc(s.duree)}</span>`:''}<span>· ${s.min_joueurs}–${s.max_joueurs} joueurs</span>${s.niveau?`<span>· ${esc(s.niveau)}</span>`:''}</div>
-    ${shown.length?`<div class="dates"><span class="label">Dates disponibles</span>
-      ${shown.map(d=>`<button type="button" class="date-btn" onclick="event.stopPropagation();App.openSession('${d.id}','${s.id}')"><span class="num">${fShort(d.date)} · ${fTime(d.date).replace(':','h')}${d.scenario_id?'':' · au choix'}</span><span class="d-info num">${plural(d.libres,'place')}</span></button>`).join('')}
-      ${dispo.length>3?`<span class="muted" style="font-size:.85rem">+ ${dispo.length-3} autre${dispo.length-3>1?'s':''} date${dispo.length-3>1?'s':''}</span>`:''}
+    ${next?`<div class="dates"><span class="label">Prochaine date prévue</span>
+      <button type="button" class="date-btn" onclick="event.stopPropagation();App.openSession('${next.id}','${s.id}')"><span class="num">${fShort(next.date)} · ${fTime(next.date).replace(':','h')}${next.scenario_id?'':' · au choix'}</span><span class="d-info num">${plural(next.libres,'place')} libre${next.libres>1?'s':''}</span></button>
     </div>`:''}
+    ${u?`<button type="button" class="tick" role="checkbox" aria-checked="${!!done}" aria-label="Déjà joué : ${esc(s.titre)}" onclick="event.stopPropagation();App.toggleDone('${s.id}')"><span class="played" aria-hidden="true">Déjà joué</span><span class="played todo" aria-hidden="true">À faire</span><span class="tbox">${check}</span></button>`:''}
   </div>`;
 }
 function openScenario(id){
