@@ -239,6 +239,16 @@ footer img{width:96px;height:96px}
 }
 </style><style>
 .loading{padding:60px 0;text-align:center;color:var(--muted)}
+.formule{border-bottom:1px dotted var(--line);padding-bottom:6px}
+.formule > .qty{border-bottom:0}
+.formule .qty small + small{margin-top:2px}
+.f-lines{display:grid;gap:8px}
+.f-line{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:end;padding:10px;border:1px solid var(--line);border-radius:var(--r);background:var(--ink)}
+.f-lab{display:grid;gap:3px;font-family:var(--f-label);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.f-lab select{width:auto;min-width:120px;font-family:var(--f-body);font-size:.95rem;letter-spacing:0;text-transform:none;color:var(--bone)}
+.f-choix{list-style:none;margin:6px 0;padding:0;display:grid;gap:2px;font-size:.92rem;color:#d6cfbd}
+.f-choix b{font-weight:500;color:var(--bone)}
+.f-paliers{line-height:1.5;text-align:right}
 .err{color:var(--bad)}
 .box p + p{margin-top:0}
 </style>
@@ -334,7 +344,8 @@ const sess=id=>D.planning.find(x=>x.id===id)||D.mj.sessions.find(x=>x.id===id);
 const isActive=r=>r.statut==='confirmee'||(r.statut==='option'&&(r.paiement_declare||T(r.expires_at)>Date.now()));
 const partsOf=r=>r.parts!=null?Number(r.parts):(r.parent_id?0:Number(r.places||1));
 const repasSum=rep=>(rep||[]).reduce((a,x)=>a+Number(x.prix)*Number(x.qty),0);
-const repasLabel=rep=>{rep=(rep||[]).filter(x=>x.qty>0); return rep.length?rep.map(x=>x.qty+' × '+x.nom).join(', '):'Aucun repas';};
+function choixResume(ch){const c={}; (ch||[]).forEach(x=>c[x]=(c[x]||0)+1); return Object.entries(c).map(([k,v])=>v+' '+k).join(', ');}
+const repasLabel=rep=>{rep=(rep||[]).filter(x=>x.qty>0); return rep.length?rep.map(x=>x.choix?`${x.nom} ×${x.choix.length} (${choixResume(x.choix)})`:x.qty+' × '+x.nom).join(' ; '):'Aucun repas';};
 function totalMine(r){
   if(r.type==='ouverte') return r.prix*r.places+repasSum(r.repas);
   const size=r.parent_id?(r.org?.places||1):r.places; return r.prix/size*partsOf(r)+repasSum(r.repas);
@@ -406,7 +417,7 @@ function vAccueil(){
   </section>
   ${D.menu.some(m=>m.dispo)?`<section style="display:grid;gap:16px">
     <div class="sec-head"><h2>À table</h2></div>
-    <div class="menu-list menu-cols">${D.menu.filter(m=>m.dispo).map(m=>`<div class="it"><div><div class="n">${esc(m.nom)}</div><div class="d">${esc(m.descr)}</div></div><div class="p">${eur(m.prix)}</div></div>`).join('')}</div>
+    <div class="menu-list menu-cols">${D.menu.filter(m=>m.dispo).map(m=>m.formule?`<div class="it formule-card"><div><div class="n">${esc(m.nom)}</div>${m.descr?`<div class="d">${esc(m.descr)}</div>`:''}<ul class="f-choix">${m.formule.choix.map(o=>`<li><b>${esc(o.nom)}</b>${o.descr?` · ${esc(o.descr)}`:''}</li>`).join('')}</ul><div class="d">Au choix, mélangez les garnitures comme vous voulez.</div></div><div class="p f-paliers">${paliersLabel(m,'<br>')}</div></div>`:`<div class="it"><div><div class="n">${esc(m.nom)}</div><div class="d">${esc(m.descr)}</div></div><div class="p">${eur(m.prix)}</div></div>`).join('')}</div>
     <p class="note">À commander au moment de la réservation, servi pendant le jeu.<br>Si vous avez un régime alimentaire particulier, n'hésitez pas à le faire savoir.</p>
   </section>`:''}
   <section style="display:grid;gap:16px">
@@ -478,9 +489,30 @@ function openSession(id){
   else html+=bookingForm(s,sc);
   openDrawer(sc.titre,html); updateTotal();
 }
-const menuInputs=(prefix='q')=>D.menu.filter(m=>m.dispo).map(m=>`<div class="qty"><span class="n">${esc(m.nom)}<small>${esc(m.descr)}${m.descr?' · ':''}${eur(m.prix)}</small></span><input type="number" min="0" max="30" value="0" id="${prefix}-${m.id}" name="${prefix}-${m.id}" aria-label="Quantité ${esc(m.nom)}"></div>`).join('');
-function readRepas(f,prefix='q'){const o={}; D.menu.forEach(m=>{const q=f[prefix+'-'+m.id]; if(q&&+q.value>0) o[m.id]=Math.min(30,Math.round(+q.value));}); return o;}
-function repasFormTotal(f,prefix='q'){let t=0; D.menu.forEach(m=>{const q=f[prefix+'-'+m.id]; if(q) t+=Math.max(0,+q.value||0)*m.prix;}); return t;}
+const paliersLabel=(m,sep=' · ')=>m.formule.paliers.map(p=>`${p.n} : ${eur(p.prix)}`).join(sep);
+const unite=m=>m.formule.unite||'Choix';
+function formuleLine(m,choix){
+  const P=m.formule.paliers; const n=(choix&&choix.length)||P[0].n;
+  const ch=Array.from({length:n},(_,i)=>(choix&&choix[i])||m.formule.choix[0].nom);
+  return `<div class="f-line"><label class="f-lab">Nombre <select class="f-n" onchange="App.formuleCount(this)">${P.map(p=>`<option value="${p.n}" ${p.n===n?'selected':''}>${p.n} · ${eur(p.prix)}</option>`).join('')}</select></label>
+    ${ch.map((c,i)=>`<label class="f-lab">${esc(unite(m))} ${i+1} <select class="f-c">${m.formule.choix.map(o=>`<option ${o.nom===c?'selected':''}>${esc(o.nom)}</option>`).join('')}</select></label>`).join('')}
+    <button type="button" class="btn small ghost" onclick="App.removeFormule(this)" aria-label="Retirer cette formule">Retirer</button></div>`;
+}
+function formuleBlock(m,lines){
+  return `<div class="formule" data-id="${m.id}"><div class="qty"><span class="n">${esc(m.nom)}<small>${esc(m.descr)}${m.descr?' · ':''}${paliersLabel(m)}</small><small>${m.formule.choix.map(o=>esc(o.nom)+(o.descr?' ('+esc(o.descr)+')':'')).join(' · ')}</small></span><button type="button" class="btn small" onclick="App.addFormule(this)">Ajouter</button></div><div class="f-lines">${(lines||[]).map(l=>formuleLine(m,l)).join('')}</div></div>`;
+}
+const fire=el=>{const f=el.closest('form'); if(f) f.dispatchEvent(new Event('input',{bubbles:true}));};
+function addFormule(btn){const b=btn.closest('.formule'); const m=D.menu.find(x=>x.id===b.dataset.id); b.querySelector('.f-lines').insertAdjacentHTML('beforeend',formuleLine(m,null)); fire(b);}
+function formuleCount(sel){const line=sel.closest('.f-line'); const b=sel.closest('.formule'); const m=D.menu.find(x=>x.id===b.dataset.id);
+  const cur=[...line.querySelectorAll('.f-c')].map(x=>x.value); const n=+sel.value; const ch=Array.from({length:n},(_,i)=>cur[i]||m.formule.choix[0].nom);
+  line.outerHTML=formuleLine(m,ch); fire(b);}
+function removeFormule(btn){const b=btn.closest('.formule'); btn.closest('.f-line').remove(); fire(b);}
+const menuInputs=(prefix='q')=>D.menu.filter(m=>m.dispo).map(m=>m.formule?formuleBlock(m,[]):`<div class="qty"><span class="n">${esc(m.nom)}<small>${esc(m.descr)}${m.descr?' · ':''}${eur(m.prix)}</small></span><input type="number" min="0" max="30" value="0" id="${prefix}-${m.id}" name="${prefix}-${m.id}" aria-label="Quantité ${esc(m.nom)}"></div>`).join('');
+function readFormules(f){return [...f.querySelectorAll('.formule .f-line')].map(l=>({id:l.closest('.formule').dataset.id,choix:[...l.querySelectorAll('.f-c')].map(x=>x.value)}));}
+function readRepas(f,prefix='q'){const items={}; D.menu.forEach(m=>{const q=f[prefix+'-'+m.id]; if(q&&+q.value>0) items[m.id]=Math.min(30,Math.round(+q.value));}); return {items,formules:readFormules(f)};}
+const formulePrix=(m,n)=>Number((m.formule.paliers.find(p=>p.n===n)||{}).prix||0);
+function repasFormTotal(f,prefix='q'){let t=0; D.menu.forEach(m=>{const q=f[prefix+'-'+m.id]; if(q) t+=Math.max(0,+q.value||0)*m.prix;});
+  readFormules(f).forEach(x=>{const m=D.menu.find(y=>y.id===x.id); if(m) t+=formulePrix(m,x.choix.length);}); return t;}
 function bookingForm(s,sc){
   const priv=s.type==='privatisable';
   const opts=priv?Array.from({length:sc.max_joueurs-sc.min_joueurs+1},(_,i)=>sc.min_joueurs+i):Array.from({length:s.libres},(_,i)=>i+1);
@@ -778,7 +810,7 @@ function editRes(id){
     <div class="field"><label for="er-g">Nom du groupe</label><input id="er-g" name="groupe" type="text" maxlength="80" value="${esc(r.groupe)}"></div></div>
     <div class="fields2"><div class="field"><label for="er-pa">Parts réglées (privatisation)</label><input id="er-pa" name="parts" type="number" min="0" max="12" value="${r.parts??''}" placeholder="—"></div>
     ${r.parent_id?`<div class="field"><span class="lbl">Table</span><p class="muted" style="padding:8px 0">Rejoint la table de ${esc(mjRes(r.parent_id)?.profiles?.pseudo||'?')}</p></div>`:`<div class="field"><label for="er-c">Code de table</label><input id="er-c" name="code" type="text" value="${esc(r.code||'')}" maxlength="16" placeholder="Privatisation seulement"></div>`}</div>
-    <div class="field"><span class="lbl">Repas</span>${D.menu.map(m=>`<div class="qty"><span class="n">${esc(m.nom)}<small>${eur(m.prix)}${m.dispo?'':' · retiré du menu'}</small></span><input type="number" min="0" max="30" name="q-${m.id}" value="${qty(m.id)}" aria-label="Quantité ${esc(m.nom)}"></div>`).join('')}${extra.length?`<p class="note">Plats supprimés du menu, conservés : ${esc(repasLabel(extra))}</p>`:''}</div>
+    <div class="field"><span class="lbl">Repas</span>${D.menu.map(m=>m.formule?formuleBlock(m,(r.repas||[]).filter(x=>x.id===m.id&&x.choix).map(x=>x.choix)):`<div class="qty"><span class="n">${esc(m.nom)}<small>${eur(m.prix)}${m.dispo?'':' · retiré du menu'}</small></span><input type="number" min="0" max="30" name="q-${m.id}" value="${qty(m.id)}" aria-label="Quantité ${esc(m.nom)}"></div>`).join('')}${extra.length?`<p class="note">Plats supprimés du menu, conservés : ${esc(repasLabel(extra))}</p>`:''}</div>
     <div class="fields2"><div class="field"><label for="er-st">Statut</label><select id="er-st" name="statut">${[['option','Option'],['confirmee','Confirmée'],['annulee','Annulée'],['expiree','Expirée']].map(([k,l])=>`<option value="${k}" ${r.statut===k?'selected':''}>${l}</option>`).join('')}</select></div>
     <div class="field"><label for="er-x">Fin de l'option</label><input id="er-x" name="expires_at" type="datetime-local" value="${localInput(r.expires_at)}"></div></div>
     <div class="field"><label for="er-m">Règlement</label><select id="er-m" name="moyen"><option value="" ${!r.paye?'selected':''}>Pas encore réglé</option><option value="paypal" ${r.paye&&r.moyen!=='especes'?'selected':''}>Réglé par PayPal</option><option value="especes" ${r.paye&&r.moyen==='especes'?'selected':''}>Réglé en espèces</option></select></div>
@@ -788,7 +820,8 @@ function editRes(id){
 }
 async function saveRes(e,id){
   e.preventDefault(); const f=e.target; const btn=f.querySelector('[type=submit]'); const old=id?mjRes(id):null;
-  const repas=[]; D.menu.forEach(m=>{const q=Math.round(+f['q-'+m.id].value||0); if(q>0){const prev=(old?.repas||[]).find(x=>x.id===m.id); repas.push({id:m.id,nom:m.nom,prix:prev?prev.prix:m.prix,qty:Math.min(30,q)});}});
+  const repas=[]; D.menu.filter(m=>!m.formule).forEach(m=>{const q=Math.round(+f['q-'+m.id].value||0); if(q>0){const prev=(old?.repas||[]).find(x=>x.id===m.id&&!x.choix); repas.push({id:m.id,nom:m.nom,prix:prev?prev.prix:m.prix,qty:Math.min(30,q)});}});
+  readFormules(f).forEach(x=>{const m=D.menu.find(y=>y.id===x.id); if(m) repas.push({id:m.id,nom:m.nom,prix:formulePrix(m,x.choix.length),qty:1,choix:x.choix});});
   (old?.repas||[]).filter(x=>!D.menu.some(m=>m.id===x.id)).forEach(x=>repas.push(x));
   const moyen=f.moyen.value;
   const patch={user_id:f.user_id.value,session_id:f.session_id.value,places:Math.max(1,+f.places.value||1),parts:f.parts.value===''?null:Math.max(0,+f.parts.value),groupe:f.groupe.value.trim(),repas,statut:f.statut.value,
@@ -904,23 +937,38 @@ async function delScen(btn,id){ if(D.mj.sessions.some(s=>s.scenario_id===id)){to
   await run(btn,async()=>{ chk(await sb.from('scenarios').delete().eq('id',id)); await refresh(); closeDrawer(); toast('Scénario retiré.'); }); }
 
 function mjMenu(){
-  return `<div style="display:grid;gap:10px"><div class="row" style="justify-content:space-between"><p class="muted">Un plat décoché disparaît des réservations sans toucher aux commandes passées.</p><button class="btn primary small" type="button" onclick="App.editMenu(null)">Ajouter un plat</button></div>
+  return `<div style="display:grid;gap:10px"><div class="row" style="justify-content:space-between"><p class="muted">Plat simple : le joueur choisit une quantité. Formule : le joueur choisit un nombre (1, 2, 3…) puis le choix de chacun. Un plat décoché disparaît des réservations sans toucher aux commandes passées.</p><button class="btn primary small" type="button" onclick="App.editMenu(null)">Ajouter un plat</button></div>
   ${D.menu.length?`<div class="tbl-wrap"><table><thead><tr><th>Plat</th><th>Prix</th><th>Proposé</th><th></th></tr></thead><tbody>
-  ${D.menu.map(m=>`<tr><td><b>${esc(m.nom)}</b><div class="sub">${esc(m.descr)}</div></td><td class="num">${eur(m.prix)}</td><td><input type="checkbox" aria-label="Proposer ${esc(m.nom)}" ${m.dispo?'checked':''} onchange="App.toggleMenu(this,'${m.id}')"></td><td><button class="btn small ghost" type="button" onclick="App.editMenu('${m.id}')">Modifier</button></td></tr>`).join('')}
+  ${D.menu.map(m=>`<tr><td><b>${esc(m.nom)}</b>${m.formule?' <span class="pill brass">Formule</span>':''}<div class="sub">${esc(m.descr)}</div>${m.formule?`<div class="sub">${m.formule.choix.map(o=>esc(o.nom)).join(' · ')}</div>`:''}</td><td class="num">${m.formule?paliersLabel(m,'<br>'):eur(m.prix)}</td><td><input type="checkbox" aria-label="Proposer ${esc(m.nom)}" ${m.dispo?'checked':''} onchange="App.toggleMenu(this,'${m.id}')"></td><td><button class="btn small ghost" type="button" onclick="App.editMenu('${m.id}')">Modifier</button></td></tr>`).join('')}
   </tbody></table></div>`:emptyBox('Aucun plat pour l\'instant.')}</div>`;
 }
 function editMenu(id){
-  const m=id?D.menu.find(x=>x.id===id):{nom:'',descr:'',prix:10,dispo:true,position:D.menu.length};
-  openDrawer(id?'Modifier le plat':'Nouveau plat',`<form onsubmit="App.saveMenu(event,'${id||''}')">
+  const m=id?D.menu.find(x=>x.id===id):{nom:'',descr:'',prix:10,dispo:true,position:D.menu.length,formule:null};
+  const fo=m.formule;
+  openDrawer(id?'Modifier le plat':'Nouveau plat',`<form onsubmit="App.saveMenu(event,'${id||''}')" onchange="if(event.target.name==='kind'){this.querySelector('.k-simple').hidden=this.kind.value!=='simple';this.querySelector('.k-formule').hidden=this.kind.value!=='formule';}">
+    <div class="field"><label for="em-k">Type</label><select id="em-k" name="kind"><option value="simple" ${fo?'':'selected'}>Plat simple (le joueur choisit une quantité)</option><option value="formule" ${fo?'selected':''}>Formule (nombre au choix, puis un choix par élément)</option></select></div>
     <div class="field"><label for="em-n">Nom</label><input id="em-n" name="nom" type="text" value="${esc(m.nom)}" required maxlength="80"></div>
     <div class="field"><label for="em-d">Description</label><input id="em-d" name="descr" type="text" value="${esc(m.descr)}" maxlength="160"></div>
-    <div class="fields2"><div class="field"><label for="em-p">Prix (€)</label><input id="em-p" name="prix" type="number" min="0" step="0.5" value="${m.prix}"></div>
-    <div class="field"><label for="em-o">Ordre d'affichage</label><input id="em-o" name="position" type="number" value="${m.position||0}"></div></div>
+    <div class="k-simple" ${fo?'hidden':''}><div class="field"><label for="em-p">Prix (€)</label><input id="em-p" name="prix" type="number" min="0" step="0.5" value="${m.prix}"></div></div>
+    <div class="k-formule" style="display:grid;gap:14px" ${fo?'':'hidden'}>
+      <div class="field"><label for="em-u">Nom d'un élément</label><input id="em-u" name="unite" type="text" value="${esc(fo?.unite||'Croque')}" maxlength="30"></div>
+      <div class="field"><label for="em-pa">Prix selon le nombre (une ligne par palier : nombre = prix)</label><textarea id="em-pa" name="paliers" style="min-height:80px">${fo?fo.paliers.map(p=>p.n+' = '+p.prix).join('\n'):'1 = 5\n2 = 9\n3 = 12'}</textarea></div>
+      <div class="field"><label for="em-ch">Choix possibles (une ligne par choix : nom : description)</label><textarea id="em-ch" name="choix" style="min-height:100px">${fo?fo.choix.map(o=>o.nom+(o.descr?' : '+o.descr:'')).join('\n'):''}</textarea></div>
+    </div>
+    <div class="field"><label for="em-o">Ordre d'affichage</label><input id="em-o" name="position" type="number" value="${m.position||0}"></div>
     <label class="check"><input type="checkbox" name="dispo" ${m.dispo?'checked':''}> Proposé à la réservation</label>
     <div class="row"><button class="btn primary" type="submit">Enregistrer</button>${id?`<button class="btn danger" type="button" onclick="App.delMenu(this,'${id}')">Supprimer</button>`:''}</div></form>`);
 }
 async function saveMenu(e,id){ e.preventDefault(); const f=e.target; const btn=f.querySelector('[type=submit]');
-  const data={nom:f.nom.value.trim(),descr:f.descr.value.trim(),prix:Math.max(0,+f.prix.value||0),dispo:f.dispo.checked,position:Math.round(+f.position.value||0)};
+  const data={nom:f.nom.value.trim(),descr:f.descr.value.trim(),prix:Math.max(0,+f.prix.value||0),dispo:f.dispo.checked,position:Math.round(+f.position.value||0),formule:null};
+  if(f.kind.value==='formule'){
+    const paliers=f.paliers.value.split('\n').map(l=>l.match(/^\s*(\d+)\s*[=:]\s*([\d.,]+)/)).filter(Boolean).map(x=>({n:+x[1],prix:+x[2].replace(',','.')})).filter(p=>p.n>=1&&p.n<=12).sort((a,b)=>a.n-b.n);
+    const choix=f.choix.value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const i=l.indexOf(':'); return i>0?{nom:l.slice(0,i).trim(),descr:l.slice(i+1).trim()}:{nom:l,descr:''};});
+    if(!paliers.length){toast('Indiquez au moins un palier, par exemple « 1 = 5 ».');return;}
+    if(!choix.length){toast('Indiquez au moins un choix.');return;}
+    if(new Set(choix.map(c=>c.nom)).size!==choix.length){toast('Deux choix portent le même nom.');return;}
+    data.formule={unite:f.unite.value.trim()||'Choix',paliers,choix}; data.prix=paliers[0].prix;
+  }
   await run(btn,async()=>{ if(id) chk(await sb.from('menu_items').update(data).eq('id',id)); else chk(await sb.from('menu_items').insert(data)); await refresh(); closeDrawer(); toast('Menu mis à jour.'); }); }
 async function toggleMenu(cb,id){ const m=D.menu.find(x=>x.id===id); await run(null,async()=>{ chk(await sb.from('menu_items').update({dispo:!m.dispo}).eq('id',id)); await refresh(); }); }
 async function delMenu(btn,id){ if(!confirm('Supprimer ce plat ? Les commandes déjà passées le gardent.')) return; await run(btn,async()=>{ chk(await sb.from('menu_items').delete().eq('id',id)); await refresh(); closeDrawer(); toast('Plat supprimé.'); }); }
@@ -941,7 +989,7 @@ window.App={planFilter(k){UI.planFilter=k;render();}, scenFilter(k){UI.scenFilte
   reload(btn){run(btn,refresh);},
   openSession,openScenario,closeDrawer,updateTotal,book,declarePaid,toggleDone,signup,login,forgot,sendReset,savePassword,logout,cancelMine,showPay,
   openJoin,joinLookup,joinTotal,joinSubmit,copyCode,
-  validate,editRes,saveRes,extend,delRes,editSess,saveSess,dupSess,delSess,editScen,saveScen,delScen,pickImg,clearImg,editMenu,saveMenu,toggleMenu,delMenu,saveSettings};
+  validate,editRes,saveRes,extend,delRes,editSess,saveSess,dupSess,delSess,editScen,saveScen,delScen,pickImg,clearImg,editMenu,saveMenu,addFormule,formuleCount,removeFormule,toggleMenu,delMenu,saveSettings};
 
 let first=true;
 sb.auth.onAuthStateChange((ev,session)=>{
