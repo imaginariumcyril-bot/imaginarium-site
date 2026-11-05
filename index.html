@@ -867,7 +867,7 @@ function editSess(id){
   const s=id?mjSess(id):{date:Date.now()+7*DAY,scenario_id:D.scenarios[0]?.id,type:'ouverte',places:6,prix:90,note:''};
   const pp=Number(D.settings.prix_place??20);
   const d=new Date(s.date); const pad=n=>String(n).padStart(2,'0');
-  const ds=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`, ts=id?`${pad(d.getHours())}:${pad(d.getMinutes())}`:'20:00';
+  const ds=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`, ts=id?`${pad(d.getHours())}:${pad(d.getMinutes())}`:'19:30';
   const nRes=id?D.mj.res.filter(r=>r.session_id===id&&isActive(r)).length:0;
   openDrawer(id?'Modifier la partie':'Nouvelle partie',`<form onsubmit="App.saveSess(event,'${id||''}')" >
     <div class="fields2"><div class="field"><label for="es-d">Date</label><input id="es-d" name="d" type="date" value="${ds}" required></div><div class="field"><label for="es-t">Heure</label><input id="es-t" name="t" type="time" value="${ts}" required></div></div>
