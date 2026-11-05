@@ -322,7 +322,7 @@ async function loadUser(){
     sb.from('scenario_done').select('scenario_id').eq('user_id',D.user.id),
     sb.rpc('my_reservations')]);
   D.profile=chk(pr); D.done=new Set((chk(dn)||[]).map(x=>x.scenario_id));
-  D.myRes=(chk(mr)||[]).map(r=>({...r,prix:Number(r.prix)}));
+  D.myRes=(chk(mr)||[]).map(r=>({...r,prix:Number(r.prix_session??r.prix)}));
 }
 async function loadMJ(){
   if(!D.profile?.is_mj){D.mj={res:[],profiles:[],sessions:[]};return;}
@@ -749,7 +749,7 @@ function showPay(id){const r=D.myRes.find(x=>x.id===id); if(r) openDrawer('Paiem
 /* ---------- Espace MJ ---------- */
 const mjSess=id=>D.mj.sessions.find(x=>x.id===id);
 const mjRes=id=>D.mj.res.find(x=>x.id===id);
-function mjTotal(r){ const s=mjSess(r.session_id); if(!s) return repasSum(r.repas); if(s.type==='ouverte') return s.prix*r.places+repasSum(r.repas); const o=r.parent_id?mjRes(r.parent_id):r; return s.prix/Math.max(1,o?o.places:1)*partsOf(r)+repasSum(r.repas); }
+function mjTotal(r){ const s=mjSess(r.session_id); if(!s) return repasSum(r.repas); const prix=Number(r.prix_session??s.prix); if(s.type==='ouverte') return prix*r.places+repasSum(r.repas); const o=r.parent_id?mjRes(r.parent_id):r; return prix/Math.max(1,o?o.places:1)*partsOf(r)+repasSum(r.repas); }
 function mjTaken(o){ return partsOf(o)+D.mj.res.filter(x=>x.parent_id===o.id&&isActive(x)).reduce((a,x)=>a+partsOf(x),0); }
 function vMJ(){
   const t=UI.mjTab;
@@ -853,16 +853,18 @@ function mjPlanning(){
   ${past.length?`<details><summary class="label" style="cursor:pointer">Parties passées (${past.length})</summary><div class="tbl-wrap" style="margin-top:10px"><table>${head}<tbody>${past.map(row).join('')}</tbody></table></div></details>`:''}</div>`;
 }
 function editSess(id){
-  const s=id?mjSess(id):{date:Date.now()+7*DAY,scenario_id:D.scenarios[0]?.id,type:'ouverte',places:6,prix:15,note:''};
+  const s=id?mjSess(id):{date:Date.now()+7*DAY,scenario_id:D.scenarios[0]?.id,type:'ouverte',places:6,prix:90,note:''};
+  const pp=Number(D.settings.prix_place??20);
   const d=new Date(s.date); const pad=n=>String(n).padStart(2,'0');
   const ds=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`, ts=id?`${pad(d.getHours())}:${pad(d.getMinutes())}`:'20:00';
   const nRes=id?D.mj.res.filter(r=>r.session_id===id&&isActive(r)).length:0;
-  openDrawer(id?'Modifier la partie':'Nouvelle partie',`<form onsubmit="App.saveSess(event,'${id||''}')">
+  openDrawer(id?'Modifier la partie':'Nouvelle partie',`<form onsubmit="App.saveSess(event,'${id||''}')" onchange="if(event.target.name==='type'){const o=this.type.value==='ouverte';this.querySelector('.px-o').hidden=!o;this.querySelector('.px-p').hidden=o;}">
     <div class="fields2"><div class="field"><label for="es-d">Date</label><input id="es-d" name="d" type="date" value="${ds}" required></div><div class="field"><label for="es-t">Heure</label><input id="es-t" name="t" type="time" value="${ts}" required></div></div>
     <div class="field"><label for="es-sc">Scénario</label><select id="es-sc" name="scenario_id">${D.scenarios.map(x=>`<option value="${x.id}" ${x.id===s.scenario_id?'selected':''}>${esc(x.titre)}</option>`).join('')}</select></div>
     <div class="fields2"><div class="field"><label for="es-ty">Formule</label><select id="es-ty" name="type"><option value="ouverte" ${s.type==='ouverte'?'selected':''}>Partie ouverte (à la place)</option><option value="privatisable" ${s.type==='privatisable'?'selected':''}>Privatisable (la table)</option></select></div>
     <div class="field"><label for="es-p">Places</label><input id="es-p" name="places" type="number" min="1" max="12" value="${s.places}"></div></div>
-    <div class="field"><label for="es-px">Prix (€, par place si ouverte, par table si privatisable)</label><input id="es-px" name="prix" type="number" min="0" step="0.5" value="${s.prix}"></div>
+    <p class="px-o muted" ${s.type==='ouverte'?'':'hidden'}>Prix de la place : <b>${eur(pp)}</b>, le même pour toutes les parties ouvertes (modifiable dans Réglages).</p>
+    <div class="px-p field" ${s.type==='ouverte'?'hidden':''}><label for="es-px">Prix de la table (€)</label><input id="es-px" name="prix" type="number" min="0" step="0.5" value="${s.type==='ouverte'?90:s.prix}"></div>
     <div class="field"><label for="es-n">Note visible des joueurs</label><input id="es-n" name="note" type="text" value="${esc(s.note)}"></div>
     ${nRes?`<p class="note">${nRes} réservation(s) active(s) sur cette partie.</p>`:''}
     <div class="row"><button class="btn primary" type="submit">Enregistrer</button>${id?`<button class="btn danger" type="button" onclick="App.delSess(this,'${id}')">Supprimer la partie</button>`:''}</div>
@@ -871,7 +873,7 @@ function editSess(id){
 async function saveSess(e,id){
   e.preventDefault(); const f=e.target; const btn=f.querySelector('[type=submit]');
   const [y,mo,da]=f.d.value.split('-').map(Number); const [h,mi]=f.t.value.split(':').map(Number);
-  const data={date:new Date(y,mo-1,da,h,mi).toISOString(),scenario_id:f.scenario_id.value,type:f.type.value,places:Math.max(1,+f.places.value||1),prix:Math.max(0,+f.prix.value||0),note:f.note.value.trim()};
+  const data={date:new Date(y,mo-1,da,h,mi).toISOString(),scenario_id:f.scenario_id.value,type:f.type.value,places:Math.max(1,+f.places.value||1),prix:f.type.value==='ouverte'?Number(D.settings.prix_place??20):Math.max(0,+f.prix.value||0),note:f.note.value.trim()};
   await run(btn,async()=>{ if(id) chk(await sb.from('sessions').update(data).eq('id',id)); else chk(await sb.from('sessions').insert(data)); await refresh(); closeDrawer(); toast('Planning mis à jour.'); });
 }
 async function dupSess(btn,id){ const s=mjSess(id);
@@ -977,12 +979,15 @@ function mjReglages(){
   const st=D.settings;
   return `<form class="card" style="max-width:640px" onsubmit="App.saveSettings(event)">
     <div class="field"><label for="st-p">Lien PayPal.me</label><input id="st-p" name="paypal" type="url" placeholder="https://paypal.me/votre-nom" value="${esc(st.paypal)}"></div>
+    <div class="field"><label for="st-pp">Prix d'une place en partie ouverte (€)</label><input id="st-pp" name="prix_place" type="number" min="0" step="0.5" value="${st.prix_place??20}"><p class="note">Le même pour toutes les parties ouvertes. En le changeant, les parties ouvertes à venir prennent le nouveau prix ; les réservations déjà faites gardent le leur.</p></div>
     <div class="field"><label for="st-d">Durée d'une option (heures)</label><input id="st-d" name="duree" type="number" min="1" max="168" value="${st.duree_option}"></div>
     <div class="field"><label for="st-a">Adresse de la salle (pied de page)</label><input id="st-a" name="adresse" type="text" value="${esc(st.adresse)}"></div>
     <div class="row"><button class="btn primary" type="submit">Enregistrer</button></div></form>`;
 }
 async function saveSettings(e){ e.preventDefault(); const f=e.target; const btn=f.querySelector('[type=submit]');
-  await run(btn,async()=>{ chk(await sb.from('settings').update({paypal:f.paypal.value.trim(),duree_option:Math.min(168,Math.max(1,Math.round(+f.duree.value||48))),adresse:f.adresse.value.trim()}).eq('id',1)); await refresh(); toast('Réglages enregistrés.'); }); }
+  const pp=Math.max(0,+f.prix_place.value||0);
+  await run(btn,async()=>{ if(pp!==Number(D.settings.prix_place)) chk(await sb.from('sessions').update({prix:pp}).eq('type','ouverte').gt('date',new Date().toISOString()));
+    chk(await sb.from('settings').update({prix_place:pp,paypal:f.paypal.value.trim(),duree_option:Math.min(168,Math.max(1,Math.round(+f.duree.value||48))),adresse:f.adresse.value.trim()}).eq('id',1)); await refresh(); toast('Réglages enregistrés.'); }); }
 
 /* ---------- Démarrage ---------- */
 window.App={planFilter(k){UI.planFilter=k;render();}, scenFilter(k){UI.scenFilter=k;render();}, mjTab(k){UI.mjTab=k;render();},
