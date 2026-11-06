@@ -376,9 +376,9 @@ const plain=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toL
 const PRIV_MIN=3; const privMin=sc=>Math.max(PRIV_MIN,sc.min_joueurs||1);
 const effScen=s=>s.scenario_id||s.choix_scenario_id||null;
 const sessTitle=s=>s.scenario_id?(scen(s.scenario_id)?.titre||'?'):(s.choix_scenario_id?(scen(s.choix_scenario_id)?.titre||'?')+' (au choix)':'Scénario au choix');
-function scenOptions(sel,onlyPriv){const g=(k,l)=>{const L=D.scenarios.filter(x=>(x.genre||'scenario')===k&&(!onlyPriv||x.max_joueurs>=PRIV_MIN)); return L.length?`<optgroup label="${l}">${L.map(x=>`<option value="${x.id}" ${x.id===sel?'selected':''}>${esc(x.titre)}</option>`).join('')}</optgroup>`:'';}; return g('scenario','Scénarios')+g('campagne','Campagnes');}
+function scenOptions(sel,onlyPriv,joueur){const g=(k,l)=>{const L=D.scenarios.filter(x=>(x.genre||'scenario')===k&&(!onlyPriv||x.max_joueurs>=PRIV_MIN)&&(!joueur||x.au_choix!==false)); return L.length?`<optgroup label="${l}">${L.map(x=>`<option value="${x.id}" ${x.id===sel?'selected':''}>${esc(x.titre)}</option>`).join('')}</optgroup>`:'';}; return g('scenario','Scénarios')+g('campagne','Campagnes');}
 // une partie « au choix » encore libre peut accueillir ce scénario
-const accueille=(x,sid)=>x.scenario_id===sid||(!x.scenario_id&&(x.choix_scenario_id===sid||(!x.choix_scenario_id&&(x.type==='ouverte'||(scen(sid)?.max_joueurs||0)>=PRIV_MIN))));
+const accueille=(x,sid)=>x.scenario_id===sid||(!x.scenario_id&&(x.choix_scenario_id===sid||(!x.choix_scenario_id&&scen(sid)?.au_choix!==false&&(x.type==='ouverte'||(scen(sid)?.max_joueurs||0)>=PRIV_MIN))));
 const MODES={paypal:'PayPal',wero:'Wero',especes:'Espèces sur place'};
 const CODE_CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const genCode=()=>'NOIR-'+Array.from({length:4},()=>CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)]).join('');
@@ -496,10 +496,10 @@ function openSession(id,pre){
   const s=D.planning.find(x=>x.id===id); if(!s){toast('Cette partie n\'est plus au planning.');return;}
   const auChoix=!effScen(s);
   let selId=effScen(s);
-  if(auChoix){ const ok=D.scenarios.filter(x=>s.type==='ouverte'||x.max_joueurs>=PRIV_MIN); selId=(pre&&ok.some(x=>x.id===pre))?pre:ok[0]?.id; }
+  if(auChoix){ const ok=D.scenarios.filter(x=>x.au_choix!==false&&(s.type==='ouverte'||x.max_joueurs>=PRIV_MIN)); selId=(pre&&ok.some(x=>x.id===pre))?pre:ok[0]?.id; }
   const sc=scen(selId)||{id:'',titre:'?',min_joueurs:1,max_joueurs:6,systeme:'',duree:''};
   const mineRes=D.myRes.filter(r=>r.session_id===id&&r.active);
-  let html=`<dl class="facts"><dt>Date</dt><dd>${fDate(s.date)} à ${fTime(s.date)}</dd>${auChoix?`<dt>Scénario</dt><dd><select id="b-scen" name="scenario" form="book" aria-label="Scénario à jouer" onchange="App.openSession('${s.id}',this.value)">${scenOptions(selId,s.type==='privatisable')}</select><div class="note" style="margin-top:4px">Scénario au choix : choisissez celui que vous voulez jouer.</div></dd>`:!s.scenario_id?`<dt>Scénario</dt><dd>${esc(sc.titre)} <span class="muted">(choisi par le premier joueur)</span></dd>`:''}${sc.systeme?`<dt>Système</dt><dd>${esc(sc.systeme)}</dd>`:''}${sc.duree?`<dt>Durée</dt><dd>${esc(sc.duree)}</dd>`:''}<dt>Formule</dt><dd>${s.type==='ouverte'?`Partie ouverte · ${eur(s.prix)} la place`:`Privatisation · ${eur(s.prix)} par joueur (${privMin(sc)} à ${sc.max_joueurs} joueurs)`}</dd><dt>Disponibilité</dt><dd>${sessPill(s)}</dd>${s.note?`<dt>Note</dt><dd>${esc(s.note)}</dd>`:''}</dl>
+  let html=`<dl class="facts"><dt>Date</dt><dd>${fDate(s.date)} à ${fTime(s.date)}</dd>${auChoix?`<dt>Scénario</dt><dd><select id="b-scen" name="scenario" form="book" aria-label="Scénario à jouer" onchange="App.openSession('${s.id}',this.value)">${scenOptions(selId,s.type==='privatisable',true)}</select><div class="note" style="margin-top:4px">Scénario au choix : choisissez celui que vous voulez jouer.</div></dd>`:!s.scenario_id?`<dt>Scénario</dt><dd>${esc(sc.titre)} <span class="muted">(choisi par le premier joueur)</span></dd>`:''}${sc.systeme?`<dt>Système</dt><dd>${esc(sc.systeme)}</dd>`:''}${sc.duree?`<dt>Durée</dt><dd>${esc(sc.duree)}</dd>`:''}<dt>Formule</dt><dd>${s.type==='ouverte'?`Partie ouverte · ${eur(s.prix)} la place`:`Privatisation · ${eur(s.prix)} par joueur (${privMin(sc)} à ${sc.max_joueurs} joueurs)`}</dd><dt>Disponibilité</dt><dd>${sessPill(s)}</dd>${s.note?`<dt>Note</dt><dd>${esc(s.note)}</dd>`:''}</dl>
   ${sc.accroche?`<p class="prose">${esc(sc.accroche)}</p>`:''}${sc.id?`<div class="row"><button class="btn small ghost" type="button" onclick="App.openScenario('${sc.id}')">Lire la fiche ${sc.genre==='campagne'?'de la campagne':'du scénario'}</button></div>`:''}`;
   if(mineRes.length) html+=mineRes.map(r=>`<div class="box brass"><div class="row">${statusPill(r,totalMine(r))}</div><p>${s.type==='ouverte'?'Vous avez déjà '+plural(r.places,'place')+' sur cette partie.':r.parent_id?'Vous avez rejoint cette table privatisée.':'Vous avez privatisé cette table.'}</p><a class="btn small" href="#compte" onclick="App.closeDrawer()">Voir dans mon compte</a></div>`).join('');
   const bookable=sessState(s)==='libre';
@@ -950,7 +950,7 @@ async function delSess(btn,id){ const n=D.mj.res.filter(r=>r.session_id===id).le
 function mjScenarios(){
   return `<div style="display:grid;gap:10px"><div class="row" style="justify-content:space-between"><p class="muted">${plural(D.scenarios.length,'scénario')} au catalogue. Les flèches règlent l'ordre d'affichage pour les joueurs.</p><button class="btn primary small" type="button" onclick="App.editScen(null)">Ajouter un scénario</button></div>
   ${D.scenarios.length?`<div class="tbl-wrap"><table><thead><tr><th>Ordre</th><th>Titre</th><th>Système</th><th>Joueurs</th><th>Image</th><th></th></tr></thead><tbody>
-  ${D.scenarios.map((s,i)=>`<tr><td><div class="row" style="flex-wrap:nowrap;gap:4px"><button class="btn small ghost" type="button" aria-label="Monter ${esc(s.titre)}" ${i===0?'disabled':''} onclick="App.moveScen(this,'${s.id}',-1)">↑</button><button class="btn small ghost" type="button" aria-label="Descendre ${esc(s.titre)}" ${i===D.scenarios.length-1?'disabled':''} onclick="App.moveScen(this,'${s.id}',1)">↓</button></div></td><td><b>${esc(s.titre)}</b><div class="sub">${esc(s.accroche)}</div></td><td>${esc(s.systeme)}</td><td class="num">${s.min_joueurs}–${s.max_joueurs}</td><td>${s.image_url?'Oui':'—'}</td><td><button class="btn small ghost" type="button" onclick="App.editScen('${s.id}')">Modifier</button></td></tr>`).join('')}
+  ${D.scenarios.map((s,i)=>`<tr><td><div class="row" style="flex-wrap:nowrap;gap:4px"><button class="btn small ghost" type="button" aria-label="Monter ${esc(s.titre)}" ${i===0?'disabled':''} onclick="App.moveScen(this,'${s.id}',-1)">↑</button><button class="btn small ghost" type="button" aria-label="Descendre ${esc(s.titre)}" ${i===D.scenarios.length-1?'disabled':''} onclick="App.moveScen(this,'${s.id}',1)">↓</button></div></td><td><b>${esc(s.titre)}</b><div class="sub">${esc(s.accroche)}</div>${s.au_choix===false?'<span class="pill warn">Hors « au choix »</span>':''}</td><td>${esc(s.systeme)}</td><td class="num">${s.min_joueurs}–${s.max_joueurs}</td><td>${s.image_url?'Oui':'—'}</td><td><button class="btn small ghost" type="button" onclick="App.editScen('${s.id}')">Modifier</button></td></tr>`).join('')}
   </tbody></table></div>`:emptyBox('Aucun scénario pour l\'instant. Commencez par en ajouter un.')}</div>`;
 }
 async function moveScen(btn,id,dir){
@@ -970,6 +970,7 @@ function editScen(id){
       <div class="row"><label class="btn small" for="esc-img">Choisir une image</label><input id="esc-img" type="file" accept="image/*" class="sr" onchange="App.pickImg(this)"><button class="btn small ghost" type="button" onclick="App.clearImg()">Retirer l'image</button></div>
       <p class="note">Format paysage conseillé (16:9). L'image est recadrée automatiquement.</p></div>
     <div class="field"><label for="esc-g">Type</label><select id="esc-g" name="genre"><option value="scenario" ${s.genre!=='campagne'?'selected':''}>Scénario</option><option value="campagne" ${s.genre==='campagne'?'selected':''}>Campagne</option></select></div>
+    <label class="check"><input type="checkbox" name="au_choix" ${s.au_choix!==false?'checked':''}> Peut être choisi par les joueurs dans une partie « Scénario au choix »</label>
     ${inp('titre','Titre','text','required maxlength="120"')}
     <div class="fields2">${inp('systeme','Système de jeu')}${inp('duree','Durée')}</div>
     <div class="fields2">${inp('min_joueurs','Joueurs min.','number','min="1" max="12"')}${inp('max_joueurs','Joueurs max.','number','min="1" max="12"')}</div>
@@ -1002,7 +1003,7 @@ async function saveScen(e,id){
   const min=Math.max(1,+f.min_joueurs.value||1), max=Math.max(min,+f.max_joueurs.value||min);
   await run(btn,async()=>{
     let image_url=pendingImg; if(image_url.startsWith('data:')) image_url=await uploadImg(image_url);
-    const data={genre:f.genre.value,titre:f.titre.value.trim(),systeme:f.systeme.value.trim(),duree:f.duree.value.trim(),min_joueurs:min,max_joueurs:max,ambiance:f.ambiance.value.trim(),niveau:f.niveau.value.trim(),pj:f.pj.value.trim(),accroche:f.accroche.value.trim(),description:f.description.value.trim(),avert:f.avert.value.trim(),image_url};
+    const data={genre:f.genre.value,au_choix:f.au_choix.checked,titre:f.titre.value.trim(),systeme:f.systeme.value.trim(),duree:f.duree.value.trim(),min_joueurs:min,max_joueurs:max,ambiance:f.ambiance.value.trim(),niveau:f.niveau.value.trim(),pj:f.pj.value.trim(),accroche:f.accroche.value.trim(),description:f.description.value.trim(),avert:f.avert.value.trim(),image_url};
     if(id) chk(await sb.from('scenarios').update(data).eq('id',id)); else chk(await sb.from('scenarios').insert({...data,position:Math.max(0,...D.scenarios.map(x=>x.position||0))+1}));
     await refresh(); closeDrawer(); toast('Catalogue mis à jour.');
   });
