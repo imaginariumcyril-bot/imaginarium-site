@@ -145,7 +145,8 @@ main{max-width:1120px;margin:0 auto;padding:28px 16px 80px;display:grid;gap:40px
 .scen .amb{font-family:var(--f-fell);font-style:italic;font-size:.95rem;color:var(--muted);margin-top:-6px}
 .sfilters{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
 .sf{display:grid;gap:4px;min-width:150px;flex:1 1 150px;max-width:240px}
-.sf select{width:100%}
+.sf select,.sf input{width:100%}
+.sf-q{flex:2 1 220px;max-width:none}
 .scen .dates{display:grid;gap:6px;margin-top:6px;padding-top:10px;border-top:1px dotted var(--line)}
 .date-btn{display:flex;flex-direction:column;gap:1px;align-items:flex-start;width:100%;background:var(--ink);border:1px solid var(--line);border-radius:var(--r);padding:6px 10px;cursor:pointer;font-size:.92rem;text-align:left}
 .date-btn > span:first-child{white-space:nowrap}
@@ -368,6 +369,7 @@ function sessPill(s){
   if(s.type==='ouverte') return s.libres>0?`<span class="pill info num">${s.libres} place${s.libres>1?'s':''} libre${s.libres>1?'s':''}</span>`:'<span class="pill bad">Complet</span>';
   return {libre:'<span class="pill brass">Libre à privatiser</span>',option:'<span class="pill warn">Option en cours</span>',reservee:'<span class="pill mute">Privatisée</span>'}[sessState(s)];
 }
+const plain=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 const PRIV_MIN=3; const privMin=sc=>Math.max(PRIV_MIN,sc.min_joueurs||1);
 const effScen=s=>s.scenario_id||s.choix_scenario_id||null;
 const sessTitle=s=>s.scenario_id?(scen(s.scenario_id)?.titre||'?'):(s.choix_scenario_id?(scen(s.choix_scenario_id)?.titre||'?')+' (au choix)':'Scénario au choix');
@@ -642,11 +644,15 @@ function vScenarios(){
   const F=UI.sf; const norm=v=>String(v||'').trim().toLowerCase();
   const vals=k=>{const m=new Map(); D.scenarios.forEach(x=>{const v=String(x[k]||'').trim(); if(v&&!m.has(norm(v))) m.set(norm(v),v);}); return [...m.entries()].sort((a,b)=>a[1].localeCompare(b[1],'fr'));};
   if(F.genre) list=list.filter(s=>(s.genre||'scenario')===F.genre);
-  ['systeme','ambiance','niveau'].forEach(k=>{ if(F[k]) list=list.filter(s=>norm(s[k])===F[k]); });
-  const actifs=Object.values(F).some(Boolean);
+  ['systeme','niveau'].forEach(k=>{ if(F[k]) list=list.filter(s=>norm(s[k])===F[k]); });
+  if(F.ambiance) list=list.filter(s=>plain(s.ambiance).includes(plain(F.ambiance)));
+  const q=plain(UI.sq||'').trim();
+  if(q){ const mots=q.split(/\s+/); list=list.filter(s=>{const t=plain([s.titre,s.systeme,s.ambiance,s.niveau,s.accroche,s.genre==='campagne'?'campagne':'scenario',s.pj].join(' ')); return mots.every(m=>t.includes(m));}); }
+  const actifs=Object.values(F).some(Boolean)||!!q;
   const sel=(k,l,opts)=>`<label class="sf"><span class="label">${l}</span><select onchange="App.scenSF('${k}',this.value)"><option value="">Tous</option>${opts.map(([v,t])=>`<option value="${esc(v)}" ${F[k]===v?'selected':''}>${esc(t)}</option>`).join('')}</select></label>`;
   const hasCamp=D.scenarios.some(x=>x.genre==='campagne');
   const filtres=D.scenarios.length>1?`<div class="sfilters" role="group" aria-label="Filtrer les scénarios">
+    <label class="sf sf-q"><span class="label">Rechercher</span><input id="scen-q" type="search" placeholder="Ex. horreur, Cthulhu, gobelins…" value="${esc(UI.sq||'')}" oninput="App.scenQ(this.value)" autocomplete="off"></label>
     ${hasCamp?sel('genre','Type',[['scenario','Scénarios'],['campagne','Campagnes']]):''}
     ${vals('systeme').length>1?sel('systeme','Système de jeu',vals('systeme')):''}
     ${vals('ambiance').length>1?sel('ambiance','Ambiance',vals('ambiance')):''}
@@ -1025,7 +1031,8 @@ async function saveSettings(e){ e.preventDefault(); const f=e.target; const btn=
     chk(await sb.from('settings').update({prix_place:pp,paypal:f.paypal.value.trim(),duree_option:Math.min(168,Math.max(1,Math.round(+f.duree.value||48))),adresse:f.adresse.value.trim()}).eq('id',1)); await refresh(); toast('Réglages enregistrés.'); }); }
 
 /* ---------- Démarrage ---------- */
-window.App={planFilter(k){UI.planFilter=k;render();}, scenFilter(k){UI.scenFilter=k;render();}, scenSF(k,v){ if(k===null) UI.sf={genre:'',systeme:'',ambiance:'',niveau:''}; else UI.sf[k]=v; render(); }, mjTab(k){UI.mjTab=k;render();},
+window.App={planFilter(k){UI.planFilter=k;render();}, scenFilter(k){UI.scenFilter=k;render();}, scenSF(k,v){ if(k===null){ UI.sf={genre:'',systeme:'',ambiance:'',niveau:''}; UI.sq=''; } else UI.sf[k]=v; render(); },
+  scenQ(v){ UI.sq=v; render(); const i=$('#scen-q'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } }, mjTab(k){UI.mjTab=k;render();},
   reload(btn){run(btn,refresh);},
   openSession,openScenario,closeDrawer,updateTotal,book,declarePaid,toggleDone,signup,login,forgot,sendReset,savePassword,logout,cancelMine,showPay,
   openJoin,joinLookup,joinTotal,joinSubmit,copyCode,
