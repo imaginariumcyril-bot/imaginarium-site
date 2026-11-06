@@ -109,7 +109,11 @@ main{max-width:1120px;margin:0 auto;padding:28px 16px 80px;display:grid;gap:40px
 .chip[aria-pressed="true"]{border-color:var(--brass);color:var(--brass);background:#231e12}
 .week{display:grid;gap:8px}
 .week > .label{margin-top:8px}
-.sess{display:grid;grid-template-columns:76px 1fr auto;gap:16px;align-items:center;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:var(--r);padding:12px 16px;cursor:pointer;text-align:left;width:100%}
+.sess{display:grid;grid-template-columns:76px 136px 1fr auto;gap:16px;align-items:center;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:var(--r);padding:12px 16px;cursor:pointer;text-align:left;width:100%}
+.sess .thumb{width:136px;aspect-ratio:16/9;border-radius:4px;overflow:hidden;border:1px solid var(--line);background:radial-gradient(ellipse at 50% 40%,#1f1a12,#0d0b08);display:grid;place-items:center}
+.sess .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.sess .thumb img.logo{width:38%;height:auto;opacity:.35;filter:grayscale(1)}
+.sess.full .thumb img{filter:grayscale(.7)}
 .sess:hover{background:var(--panel-2)}
 .sess.t-ouverte{border-left-color:var(--info)}
 .sess.t-privatisable{border-left-color:var(--brass)}
@@ -234,12 +238,14 @@ footer{border-top:1px solid var(--line);color:var(--muted);font-size:.88rem;text
 footer img{width:96px;height:96px}
 
 @media (max-width:820px){
+  .sess{grid-template-columns:64px 104px 1fr;} .sess .thumb{width:104px} .sess .right{grid-column:2 / -1;justify-items:start;grid-auto-flow:column;justify-content:start;gap:12px;align-items:center}
   .split,.menu-cols,.contact{grid-template-columns:1fr}
   .grid3,.steps{grid-template-columns:1fr}
   .stats{grid-template-columns:1fr 1fr}
 }
 @media (max-width:520px){
   .sess{grid-template-columns:56px 1fr;}
+  .sess .thumb{grid-column:1 / -1;grid-row:1;width:100%;aspect-ratio:16/6}
   .sess .right{grid-column:1 / -1;justify-items:start;grid-auto-flow:column;justify-content:space-between;align-items:center}
   .fields2,.radio-cards{grid-template-columns:1fr}
   .date .dd{font-size:1.6rem}
@@ -468,6 +474,7 @@ function sessRow(s){
   const full=(s.type==='ouverte'&&s.libres<=0)||(s.type==='privatisable'&&sessState(s)!=='libre');
   return `<button type="button" class="sess t-${s.type} ${full?'full':''}" onclick="App.openSession('${s.id}')">
     <span class="date"><span class="dw">${d.toLocaleDateString('fr-FR',{weekday:'short'})}</span><span class="dd num">${d.getDate()}</span><span class="dm">${d.toLocaleDateString('fr-FR',{month:'short'})}</span></span>
+    <span class="thumb" aria-hidden="true">${sc0?.image_url?`<img src="${esc(sc0.image_url)}" alt="" loading="lazy">`:'<img class="logo" src="assets/logo-rond.png" alt="">'}</span>
     <span><span class="t">${esc(sc.titre)}</span>
       <span class="meta"><span class="num">${fTime(s.date)}</span>${sc.systeme?`<span>· ${esc(sc.systeme)}</span>`:''}<span>· ${s.type==='ouverte'?'Partie ouverte':'Privatisable'}</span></span></span>
     <span class="right">${sessPill(s)}${pips}<span class="muted num" style="font-size:.88rem">${s.type==='ouverte'?eur(s.prix)+' / place':eur(s.prix)+' / joueur'}</span></span>
