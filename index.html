@@ -143,6 +143,9 @@ main{max-width:1120px;margin:0 auto;padding:28px 16px 80px;display:grid;gap:40px
 .scen-thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .img-edit{display:grid;gap:8px}
 .scen .amb{font-family:var(--f-fell);font-style:italic;font-size:.95rem;color:var(--muted);margin-top:-6px}
+.sfilters{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+.sf{display:grid;gap:4px;min-width:150px;flex:1 1 150px;max-width:240px}
+.sf select{width:100%}
 .scen .dates{display:grid;gap:6px;margin-top:6px;padding-top:10px;border-top:1px dotted var(--line)}
 .date-btn{display:flex;flex-direction:column;gap:1px;align-items:flex-start;width:100%;background:var(--ink);border:1px solid var(--line);border-radius:var(--r);padding:6px 10px;cursor:pointer;font-size:.92rem;text-align:left}
 .date-btn > span:first-child{white-space:nowrap}
@@ -387,7 +390,7 @@ function busy(btn,on){ if(!btn) return; btn.disabled=on; if(on){btn.dataset.l=bt
 async function run(btn,fn){ busy(btn,true); try{ return await fn(); } catch(e){ console.error(e); toast(errMsg(e)); } finally{ busy(btn,false); } }
 
 /* ---------- Navigation ---------- */
-const UI={planFilter:'tout',scenFilter:'tous',mjTab:'options'};
+const UI={planFilter:'tout',scenFilter:'tous',mjTab:'options',sf:{genre:'',systeme:'',ambiance:'',niveau:''}};
 function route(){return (location.hash||'#accueil').slice(1);}
 function renderNav(){
   const r=route();
@@ -636,12 +639,27 @@ function vScenarios(){
   let list=D.scenarios.slice();
   if(u&&f==='faits') list=list.filter(s=>D.done.has(s.id));
   if(u&&f==='afaire') list=list.filter(s=>!D.done.has(s.id));
+  const F=UI.sf; const norm=v=>String(v||'').trim().toLowerCase();
+  const vals=k=>{const m=new Map(); D.scenarios.forEach(x=>{const v=String(x[k]||'').trim(); if(v&&!m.has(norm(v))) m.set(norm(v),v);}); return [...m.entries()].sort((a,b)=>a[1].localeCompare(b[1],'fr'));};
+  if(F.genre) list=list.filter(s=>(s.genre||'scenario')===F.genre);
+  ['systeme','ambiance','niveau'].forEach(k=>{ if(F[k]) list=list.filter(s=>norm(s[k])===F[k]); });
+  const actifs=Object.values(F).some(Boolean);
+  const sel=(k,l,opts)=>`<label class="sf"><span class="label">${l}</span><select onchange="App.scenSF('${k}',this.value)"><option value="">Tous</option>${opts.map(([v,t])=>`<option value="${esc(v)}" ${F[k]===v?'selected':''}>${esc(t)}</option>`).join('')}</select></label>`;
+  const hasCamp=D.scenarios.some(x=>x.genre==='campagne');
+  const filtres=D.scenarios.length>1?`<div class="sfilters" role="group" aria-label="Filtrer les scénarios">
+    ${hasCamp?sel('genre','Type',[['scenario','Scénarios'],['campagne','Campagnes']]):''}
+    ${vals('systeme').length>1?sel('systeme','Système de jeu',vals('systeme')):''}
+    ${vals('ambiance').length>1?sel('ambiance','Ambiance',vals('ambiance')):''}
+    ${vals('niveau').length>1?sel('niveau','Niveau',vals('niveau')):''}
+    ${actifs?`<button class="btn small ghost" type="button" onclick="App.scenSF(null)">Effacer les filtres</button>`:''}
+  </div>`:'';
   const n=D.scenarios.filter(s=>D.done.has(s.id)).length;
   return `<section style="display:grid;gap:18px">
     <div class="sec-head"><div><h2>Scénarios disponibles</h2><p class="muted" style="margin-top:6px">${plural(D.scenarios.length,'scénario')} au catalogue. ${u?'Cochez ceux que vous avez déjà joués.':'<a href="#compte">Connectez-vous</a> pour cocher ceux que vous avez joués.'}</p></div>
     ${u?`<div class="filters" role="group" aria-label="Filtrer">${[['tous','Tous'],['afaire','Pas encore joués'],['faits','Déjà joués']].map(([k,l])=>`<button class="chip" type="button" aria-pressed="${f===k}" onclick="App.scenFilter('${k}')">${l}</button>`).join('')}</div>`:''}</div>
     ${u&&D.scenarios.length?`<div style="display:grid;gap:6px;max-width:420px"><span class="label">Votre parcours · <span class="num">${n} / ${D.scenarios.length}</span> joués</span><div class="progress"><b style="width:${n/D.scenarios.length*100}%"></b></div></div>`:''}
-    <div class="scen-grid">${list.map(scenCard).join('')||emptyBox(D.scenarios.length?'Rien ici pour le moment.':'Le catalogue arrive bientôt.')}</div>
+    ${filtres}${actifs?`<p class="muted num" style="margin-top:-6px">${plural(list.length,'scénario')} correspond${list.length>1?'ent':''} à vos filtres.</p>`:''}
+    <div class="scen-grid">${list.map(scenCard).join('')||emptyBox(!D.scenarios.length?'Le catalogue arrive bientôt.':actifs?'Aucun scénario ne correspond à ces filtres. <button class="btn small" type="button" onclick="App.scenSF(null)">Effacer les filtres</button>':'Rien ici pour le moment.')}</div>
   </section>`;
 }
 function imgSlot(src,alt){
@@ -1007,7 +1025,7 @@ async function saveSettings(e){ e.preventDefault(); const f=e.target; const btn=
     chk(await sb.from('settings').update({prix_place:pp,paypal:f.paypal.value.trim(),duree_option:Math.min(168,Math.max(1,Math.round(+f.duree.value||48))),adresse:f.adresse.value.trim()}).eq('id',1)); await refresh(); toast('Réglages enregistrés.'); }); }
 
 /* ---------- Démarrage ---------- */
-window.App={planFilter(k){UI.planFilter=k;render();}, scenFilter(k){UI.scenFilter=k;render();}, mjTab(k){UI.mjTab=k;render();},
+window.App={planFilter(k){UI.planFilter=k;render();}, scenFilter(k){UI.scenFilter=k;render();}, scenSF(k,v){ if(k===null) UI.sf={genre:'',systeme:'',ambiance:'',niveau:''}; else UI.sf[k]=v; render(); }, mjTab(k){UI.mjTab=k;render();},
   reload(btn){run(btn,refresh);},
   openSession,openScenario,closeDrawer,updateTotal,book,declarePaid,toggleDone,signup,login,forgot,sendReset,savePassword,logout,cancelMine,showPay,
   openJoin,joinLookup,joinTotal,joinSubmit,copyCode,
