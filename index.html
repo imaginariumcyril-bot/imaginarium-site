@@ -143,6 +143,8 @@ main{max-width:1120px;margin:0 auto;padding:28px 16px 80px;display:grid;gap:40px
 .scen-thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .img-edit{display:grid;gap:8px}
 .scen .amb{font-family:var(--f-fell);font-style:italic;font-size:.95rem;color:var(--muted);margin-top:-6px}
+.radio-cards.modes{grid-template-columns:repeat(3,1fr)}
+@media (max-width:520px){.radio-cards.modes{grid-template-columns:1fr}}
 .sfilters{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
 .sf{display:grid;gap:4px;min-width:150px;flex:1 1 150px;max-width:240px}
 .sf select,.sf input{width:100%}
@@ -331,11 +333,12 @@ async function loadUser(){
 }
 async function loadMJ(){
   if(!D.profile?.is_mj){D.mj={res:[],profiles:[],sessions:[]};return;}
-  const [r,p,s]=await Promise.all([
+  const [r,p,w,s]=await Promise.all([
     sb.from('reservations').select('*, profiles(pseudo,email)').order('created_at'),
     sb.from('profiles').select('id,pseudo,email,is_mj').order('pseudo'),
+    sb.from('settings_private').select('wero').eq('id',1).maybeSingle(),
     sb.rpc('get_planning',{p_depuis:'2000-01-01T00:00:00Z'})]);
-  D.mj={res:chk(r)||[],profiles:chk(p)||[],sessions:(chk(s)||[]).map(normS)};
+  D.mj={res:chk(r)||[],profiles:chk(p)||[],sessions:(chk(s)||[]).map(normS),wero:(chk(w)||{}).wero||''};
 }
 async function refresh(){
   try{ await loadPublic(); await loadUser(); await loadMJ(); D.loaded=true; }
@@ -358,9 +361,9 @@ function totalMine(r){
 function takenMine(r){ return partsOf(r)+(r.membres||[]).reduce((a,m)=>a+Number(m.parts||0),0); }
 function remaining(t){const ms=T(t)-Date.now(); if(ms<=0) return 'expirée'; const h=Math.floor(ms/HOUR), m=Math.floor((ms%HOUR)/6e4); return h>=1?`reste ${h} h ${String(m).padStart(2,'0')}`:`reste ${m} min`;}
 function statusPill(r,total){
-  if(r.statut==='confirmee') return r.paye?`<span class="pill ok">Confirmée · payée${r.moyen==='especes'?' en espèces':r.moyen==='paypal'?' par PayPal':''}</span>`:(total>0?'<span class="pill ok">Confirmée</span> <span class="pill mute">À régler</span>':'<span class="pill ok">Confirmée</span>');
-  if(r.statut==='option'&&r.parent_id){ const s=sess(r.session_id); const d=r.date||s?.date; return (r.paiement_declare?'<span class="pill info">Paiement à vérifier</span>':'<span class="pill warn">Part à régler</span>')+(d?` <span class="pill mute num">avant le ${fShort(d)}</span>`:''); }
-  if(r.statut==='option') return r.paiement_declare?'<span class="pill info">Paiement à vérifier</span>':`<span class="pill warn">Option</span> <span class="pill warn cd num" data-exp="${T(r.expires_at)}">${remaining(r.expires_at)}</span>`;
+  if(r.statut==='confirmee') return r.paye?`<span class="pill ok">Confirmée · payée${r.moyen==='especes'?' en espèces':r.moyen==='paypal'?' par PayPal':r.moyen==='wero'?' par Wero':''}</span>`:(total>0?`<span class="pill ok">Confirmée</span> <span class="pill mute">${r.mode_paiement==='especes'?'À régler sur place':'À régler'}</span>`:'<span class="pill ok">Confirmée</span>');
+  if(r.statut==='option'&&r.parent_id){ const s=sess(r.session_id); const d=r.date||s?.date; return (r.paiement_declare?'<span class="pill info">Paiement à vérifier</span>':r.mode_paiement==='especes'?'<span class="pill warn">Part à régler sur place</span>':'<span class="pill warn">Part à régler</span>')+(d?` <span class="pill mute num">avant le ${fShort(d)}</span>`:''); }
+  if(r.statut==='option') return r.paiement_declare?'<span class="pill info">Paiement à vérifier</span>':`<span class="pill warn">${r.mode_paiement==='especes'?'Option · espèces sur place':'Option'}</span> <span class="pill warn cd num" data-exp="${T(r.expires_at)}">${remaining(r.expires_at)}</span>`;
   if(r.statut==='expiree') return '<span class="pill mute">Option expirée</span>';
   return '<span class="pill bad">Annulée</span>';
 }
@@ -376,6 +379,7 @@ const sessTitle=s=>s.scenario_id?(scen(s.scenario_id)?.titre||'?'):(s.choix_scen
 function scenOptions(sel,onlyPriv){const g=(k,l)=>{const L=D.scenarios.filter(x=>(x.genre||'scenario')===k&&(!onlyPriv||x.max_joueurs>=PRIV_MIN)); return L.length?`<optgroup label="${l}">${L.map(x=>`<option value="${x.id}" ${x.id===sel?'selected':''}>${esc(x.titre)}</option>`).join('')}</optgroup>`:'';}; return g('scenario','Scénarios')+g('campagne','Campagnes');}
 // une partie « au choix » encore libre peut accueillir ce scénario
 const accueille=(x,sid)=>x.scenario_id===sid||(!x.scenario_id&&(x.choix_scenario_id===sid||(!x.choix_scenario_id&&(x.type==='ouverte'||(scen(sid)?.max_joueurs||0)>=PRIV_MIN))));
+const MODES={paypal:'PayPal',wero:'Wero',especes:'Espèces sur place'};
 const CODE_CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const genCode=()=>'NOIR-'+Array.from({length:4},()=>CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)]).join('');
 
@@ -436,7 +440,7 @@ function vAccueil(){
     <div class="sec-head"><h2>Comment réserver</h2></div>
     <div class="steps">
       <div class="card"><h3>Posez une option</h3><p class="muted">Choisissez une place sur une partie ouverte ou privatisez un créneau, et ajoutez votre repas. La place est bloquée ${dur} h.</p></div>
-      <div class="card"><h3>Réglez par PayPal</h3><p class="muted">Le lien de paiement s'affiche après la réservation. Signalez votre paiement en un clic.</p></div>
+      <div class="card"><h3>Réglez comme vous voulez</h3><p class="muted">PayPal ou Wero : les coordonnées s'affichent après la réservation, et vous signalez votre paiement en un clic. Ou en espèces, sur place le jour de la partie.</p></div>
       <div class="card"><h3>Le docteur valide</h3><p class="muted">Le MJ confirme votre réservation. Sans paiement ni validation sous ${dur} h, l'option est libérée.</p></div>
     </div>
   </section>
@@ -548,8 +552,9 @@ function bookingForm(s,sc){
     </div>`:''}
     ${D.menu.some(m=>m.dispo)?`<div class="field"><span class="lbl">Repas sur place</span>${menuInputs()}</div>`:''}
     <div class="field"><span class="lbl">Paiement</span>
-      <p class="muted">Par PayPal : le lien s'affiche une fois l'option posée. Vous réglez en espèces sur place ? Dites-le dans le mot au MJ, il peut valider sans paiement en ligne.</p></div>
-    <div class="field"><label for="b-note">Un mot pour le MJ</label><textarea id="b-note" name="note" maxlength="1000" style="min-height:60px" placeholder="Allergies, paiement en espèces, première partie…"></textarea></div>
+      <div class="radio-cards modes">${Object.entries(MODES).map(([k,l],i)=>`<label><input type="radio" name="mode" value="${k}" ${i===0?'checked':''}><span>${l}</span></label>`).join('')}</div>
+      <p class="note">PayPal ou Wero : les coordonnées s'affichent une fois l'option posée. Espèces : vous réglez le jour de la partie, le MJ valide votre réservation.</p></div>
+    <div class="field"><label for="b-note">Un mot pour le MJ</label><textarea id="b-note" name="note" maxlength="1000" style="min-height:60px" placeholder="Allergies, première partie…"></textarea></div>
     <div class="total"><span>Votre total</span><b id="b-total" class="num" data-type="${s.type}" data-prix="${s.prix}">${eur(s.prix)}</b></div>
     <button class="btn primary" type="submit">Poser l'option (${D.settings.duree_option} h)</button>
     <p class="note">Rien n'est débité ici. La réservation est confirmée quand le MJ la valide.</p>
@@ -571,6 +576,7 @@ async function book(e,sid){
   if(s.type==='privatisable'){ params.p_parts=Math.min(places,Math.max(1,Math.round(+f.parts.value||1))); params.p_code=f.code.value; params.p_groupe=f.groupe.value.trim(); }
   await run(btn,async()=>{
     const r=chk(await sb.rpc('book_session',params));
+    const mode=f.mode?.value||'paypal'; if(mode!=='paypal') chk(await sb.rpc('set_mode_paiement',{p_id:r.id,p_mode:mode}));
     await refresh(); const mine=D.myRes.find(x=>x.id===r.id);
     openDrawer('Option posée',mine?payInstructions(mine):'<p>Option posée.</p>');
   });
@@ -582,18 +588,37 @@ function codeBox(r){
     <p class="num" style="font-size:.92rem">Parts réservées : <b>${takenMine(r)} / ${r.places}</b> · ${eur(r.prix)} la part</p></div>`;
 }
 function payInstructions(r){
-  const tot=totalMine(r); const priv=r.type==='privatisable'; const pp=D.settings.paypal;
+  D.payOpen=r.id; const tot=totalMine(r); const priv=r.type==='privatisable'; const pp=D.settings.paypal;
   return `<div class="box brass"><div class="row">${statusPill(r,tot)}</div>
     <p><b>${esc(r.scenario_titre)}</b>, ${fDate(r.date)} à ${fTime(r.date)}.${priv&&r.parent_id?`<br>Table privatisée par ${esc(r.org?.pseudo||'?')} · ${plural(partsOf(r),'part')}.`:''}${priv&&!r.parent_id?`<br>Vous réglez ${plural(partsOf(r),'part')} sur ${r.places}.`:''}
     <br>${r.parent_id?'Vous avez jusqu\'à la partie pour régler votre part.':r.statut==='option'?(priv?`Votre option tient jusqu'au <b>${fDT(r.expires_at)}</b>. Dès que vous réglez votre part, la table est à vous : vos amis ont ensuite jusqu'à la partie pour régler les leurs.`:`Votre option tient jusqu'au <b>${fDT(r.expires_at)}</b>.`):''}</p></div>
     ${priv&&!r.parent_id&&r.code?codeBox(r):''}
     ${tot>0&&!r.paye?`<div class="box"><h3>Régler ${eur(tot)}</h3>
-      ${pp?`<p>Payez par <b>PayPal</b> via <a href="${esc(pp)}" target="_blank" rel="noopener">${esc(pp.replace(/^https?:\/\//,''))}</a>, en indiquant en message : <b>« ${esc(D.profile?.pseudo||'')} · ${fShort(r.date)} »</b></p>`:`<p>Le lien de paiement sera bientôt disponible. En attendant, contactez le MJ.</p>`}
-      ${r.paiement_declare?'<p class="muted">Paiement signalé, le MJ va vérifier.</p>':`<button class="btn primary" type="button" onclick="App.declarePaid(this,'${r.id}')">J'ai effectué le paiement</button>`}
-      <p class="note">Vous réglez en espèces sur place ? Prévenez le MJ : il peut valider votre réservation sans paiement en ligne.</p></div>`:tot>0?'':`<div class="box"><p>Rien à régler en ligne : le MJ validera votre place.</p></div>`}
+      <div class="field"><span class="lbl">Moyen de paiement</span><div class="row" role="group" aria-label="Moyen de paiement">${Object.entries(MODES).map(([k,l])=>`<button type="button" class="chip" aria-pressed="${(r.mode_paiement||'paypal')===k}" onclick="App.setMode(this,'${r.id}','${k}')">${l}</button>`).join('')}</div></div>
+      ${payBody(r,tot)}</div>`:tot>0?'':`<div class="box"><p>Rien à régler : le MJ validera votre place.</p></div>`}
     <p class="muted">Repas : ${esc(repasLabel(r.repas))}</p>
     <a class="btn ghost" href="#compte" onclick="App.closeDrawer()">Voir mes réservations</a>`;
 }
+function payBody(r,tot){
+  const msg=`<b>« ${esc(D.profile?.pseudo||'')} · ${fShort(r.date)} »</b>`;
+  const declare=r.paiement_declare?'<p class="muted">Paiement signalé, le MJ va vérifier.</p>':`<button class="btn primary" type="button" onclick="App.declarePaid(this,'${r.id}')">J'ai effectué le paiement</button>`;
+  const mode=r.mode_paiement||'paypal';
+  if(mode==='especes') return `<p>Vous réglez <b>${eur(tot)} en espèces, sur place</b>, le jour de la partie.</p><p class="muted">${r.parent_id?'Le MJ notera votre paiement à votre arrivée.':'Le MJ va valider votre réservation. Tant qu\'il ne l\'a pas fait, votre option tient '+(r.statut==='option'?'jusqu\'au '+fDT(r.expires_at):'')+'.'}</p>`;
+  if(mode==='wero'){
+    if(D.wero===undefined){ loadWero(); }
+    const num=D.wero;
+    return num?`<p>Envoyez ${eur(tot)} par <b>Wero</b> au <b class="num">${esc(num)}</b>, avec en message : ${msg}</p>${declare}`
+      :num===''?'<p>Le paiement Wero sera bientôt disponible. En attendant, choisissez un autre moyen ou contactez le MJ.</p>':'<p class="muted">Chargement du numéro Wero…</p>';
+  }
+  const pp=D.settings.paypal;
+  return pp?`<p>Payez par <b>PayPal</b> via <a href="${esc(pp)}" target="_blank" rel="noopener">${esc(pp.replace(/^https?:\/\//,''))}</a>, en indiquant en message : ${msg}</p>${declare}`
+    :'<p>Le paiement PayPal sera bientôt disponible. En attendant, choisissez un autre moyen ou contactez le MJ.</p>';
+}
+let weroLoading=false;
+async function loadWero(){ if(weroLoading) return; weroLoading=true;
+  try{ D.wero=chk(await sb.rpc('get_wero'))||''; }catch(e){ D.wero=''; } finally{ weroLoading=false; }
+  const open=$('#drawer').classList.contains('open')&&$('#drawer-title').textContent; if(open&&D.payOpen){ const r=D.myRes.find(x=>x.id===D.payOpen); if(r) openDrawer($('#drawer-title').textContent,payInstructions(r)); } }
+async function setMode(btn,id,mode){ await run(btn,async()=>{ chk(await sb.rpc('set_mode_paiement',{p_id:id,p_mode:mode})); await refresh(); const r=D.myRes.find(x=>x.id===id); if(r){ D.payOpen=id; openDrawer('Paiement',payInstructions(r)); } }); }
 async function declarePaid(btn,id){ await run(btn,async()=>{ chk(await sb.rpc('declare_paid',{p_id:id})); await refresh(); closeDrawer(); toast('Paiement signalé. Le MJ va vérifier et confirmer.'); }); }
 
 /* ---------- Rejoindre une table ---------- */
@@ -619,7 +644,10 @@ async function joinLookup(e){
         <div class="field"><label for="jn-parts">Parts que vous réglez</label><input id="jn-parts" name="parts" type="number" min="0" max="${libres}" value="${Math.min(1,libres)}"></div>
         ${libres===0?'<p class="muted">Toutes les parts sont déjà prises : vous rejoignez la table pour votre repas uniquement.</p>':''}
         ${D.menu.some(m=>m.dispo)?`<div class="field"><span class="lbl">Repas sur place</span>${menuInputs('jq')}</div>`:''}
-        <div class="field"><label for="jn-note">Un mot pour le MJ</label><textarea id="jn-note" name="note" maxlength="1000" style="min-height:60px" placeholder="Allergies, paiement en espèces…"></textarea></div>
+        <div class="field"><span class="lbl">Paiement</span>
+      <div class="radio-cards modes">${Object.entries(MODES).map(([k,l],i)=>`<label><input type="radio" name="mode" value="${k}" ${i===0?'checked':''}><span>${l}</span></label>`).join('')}</div>
+      <p class="note">PayPal ou Wero : les coordonnées s'affichent une fois l'option posée. Espèces : vous réglez le jour de la partie, le MJ valide votre réservation.</p></div>
+        <div class="field"><label for="jn-note">Un mot pour le MJ</label><textarea id="jn-note" name="note" maxlength="1000" style="min-height:60px" placeholder="Allergies…"></textarea></div>
         <div class="total"><span>Votre total</span><b id="jn-total" class="num">${eur(pp*Math.min(1,libres))}</b></div>
         <button class="btn primary" type="submit">Rejoindre la table</button>
       </form>`);
@@ -630,6 +658,7 @@ async function joinSubmit(e,code){
   e.preventDefault(); const f=e.target; const btn=f.querySelector('[type=submit]');
   await run(btn,async()=>{
     const r=chk(await sb.rpc('join_table',{p_code:code,p_parts:Math.max(0,Math.round(+f.parts.value||0)),p_repas:readRepas(f,'jq'),p_note:f.note.value.trim()}));
+    const mode=f.mode?.value||'paypal'; if(mode!=='paypal') chk(await sb.rpc('set_mode_paiement',{p_id:r.id,p_mode:mode}));
     await refresh(); const m=D.myRes.find(x=>x.id===r.id); openDrawer('Vous avez rejoint la table',m?payInstructions(m):'');
   });
 }
@@ -744,12 +773,13 @@ function resCardPlayer(r){
   else what='privatisation'+(r.groupe?' « '+esc(r.groupe)+' »':'')+' · '+r.places+' joueurs · '+plural(partsOf(r),'part')+' réglée'+(partsOf(r)>1?'s':'')+' par vous';
   const team=(r.type==='privatisable'&&!r.parent_id&&r.active)?(r.membres||[]):[];
   const canPay=r.active&&!r.paye&&!r.paiement_declare&&tot>0;
+  const modeTxt=tot>0&&!r.paye&&r.active?`<div class="muted" style="font-size:.9rem">Paiement : ${MODES[r.mode_paiement||'paypal']}</div>`:'';
   return `<div class="res-card"><div class="row" style="justify-content:space-between"><b style="font-family:var(--f-fell);font-weight:700;font-size:1.2rem">${esc(r.scenario_titre)}</b><span class="row">${statusPill(r,tot)}</span></div>
     <div class="muted">${fDate(r.date)} à ${fTime(r.date)} · ${what} · ${eur(tot)}</div>
-    <div class="muted" style="font-size:.9rem">Repas : ${esc(repasLabel(r.repas))}</div>
+    <div class="muted" style="font-size:.9rem">Repas : ${esc(repasLabel(r.repas))}</div>${modeTxt}
     ${r.type==='privatisable'&&!r.parent_id&&r.code&&r.active?codeBox(r):''}
     ${team.length?`<div style="font-size:.9rem"><span class="label">Vos amis à la table</span><ul class="team">${team.map(j=>`<li><span>${esc(j.pseudo)} · ${plural(Number(j.parts||0),'part')}</span><span class="row">${statusPill({...j,parent_id:r.id,date:r.date},Number(j.parts||0))}</span></li>`).join('')}</ul></div>`:''}
-    ${canPay||r.statut==='option'?`<div class="row">${canPay?`<button class="btn small primary" type="button" onclick="App.showPay('${r.id}')">Payer / j'ai payé</button>`:''}${r.statut==='option'?`<button class="btn small danger" type="button" onclick="App.cancelMine(this,'${r.id}')">${r.parent_id?'Quitter la table':r.type==='privatisable'?'Annuler la privatisation':'Annuler l\'option'}</button>`:''}</div>`:''}
+    ${canPay||r.statut==='option'?`<div class="row">${canPay?`<button class="btn small primary" type="button" onclick="App.showPay('${r.id}')">${r.mode_paiement==='especes'?'Paiement sur place':'Payer / j\'ai payé'}</button>`:''}${r.statut==='option'?`<button class="btn small danger" type="button" onclick="App.cancelMine(this,'${r.id}')">${r.parent_id?'Quitter la table':r.type==='privatisable'?'Annuler la privatisation':'Annuler l\'option'}</button>`:''}</div>`:''}
   </div>`;
 }
 async function signup(e){
@@ -802,7 +832,7 @@ function vMJ(){
       <div class="stat"><span class="label">Parties à venir</span><b>${future.length}</b></div>
       <div class="stat"><span class="label">Places confirmées</span><b>${placesConf}</b></div>
     </div>
-    ${!D.settings.paypal?`<div class="box brass"><p>Le lien PayPal n'est pas encore renseigné : les joueurs ne peuvent pas payer en ligne. <button class="btn small" type="button" onclick="App.mjTab('reglages')">Le renseigner</button></p></div>`:''}
+    ${!D.settings.paypal||!D.mj.wero?`<div class="box brass"><p>${!D.settings.paypal&&!D.mj.wero?'Le lien PayPal et le numéro Wero ne sont pas encore renseignés':!D.settings.paypal?'Le lien PayPal n\'est pas encore renseigné':'Le numéro Wero n\'est pas encore renseigné'} : les joueurs qui choisissent ce moyen ne peuvent pas payer. <button class="btn small" type="button" onclick="App.mjTab('reglages')">Compléter</button></p></div>`:''}
     <div class="tabs" role="tablist">${tabs.map(([k,l,c])=>`<button role="tab" type="button" aria-selected="${t===k}" onclick="App.mjTab('${k}')">${l}${c?`<span class="count num">${c}</span>`:''}</button>`).join('')}</div>
     <div>${body}</div>
   </section>`;
@@ -814,11 +844,12 @@ function resRowMJ(r){
     if(r.parent_id) pl=`<span class="num">${plural(partsOf(r),'part')}</span><div class="sub">Table de ${esc(o?.profiles?.pseudo||'?')}</div>`;
     else pl=`<span class="num">${r.places} joueurs</span><div class="sub num">${plural(partsOf(r),'part')} · total ${mjTaken(r)}/${r.places}</div>${r.code?`<div class="sub">Code ${esc(r.code)}</div>`:''}`;
   }
-  const pay=`<button class="btn small primary" type="button" onclick="App.validate(this,'${r.id}','paypal')">PayPal reçu</button><button class="btn small" type="button" onclick="App.validate(this,'${r.id}','especes')">Espèces reçues</button>`;
+  const mode=r.mode_paiement||'paypal';
+  const pay=[['paypal','PayPal reçu'],['wero','Wero reçu'],['especes','Espèces reçues']].map(([k,l])=>`<button class="btn small ${k===mode?'primary':''}" type="button" onclick="App.validate(this,'${r.id}','${k}')">${l}</button>`).join('');
   return `<tr><td><b>${esc(u.pseudo)}</b>${r.groupe?`<div class="sub">${esc(r.groupe)}</div>`:''}<div class="sub">${esc(u.email)}</div></td>
     <td>${s?`${esc(sc?.titre||'?')}<div class="sub">${fDT(s.date)} · ${s.type==='ouverte'?'ouverte':r.parent_id?'rejoint une privatisation':'privatisation'}</div>`:'<span class="sub">Partie supprimée</span>'}</td>
     <td>${pl}</td><td><span class="sub">${esc(repasLabel(r.repas))}</span>${r.note?`<div class="sub">« ${esc(r.note)} »</div>`:''}</td>
-    <td class="num">${eur(tot)}</td>
+    <td class="num">${eur(tot)}${tot>0?`<div class="sub">${MODES[mode]}</div>`:''}</td>
     <td><div class="row">${statusPill({...r,date:s?.date},tot)}</div></td>
     <td><div class="row">${r.statut==='option'&&isActive(r)?`<button class="btn small" type="button" onclick="App.validate(this,'${r.id}','')">Valider sans paiement</button>${tot>0?pay:''}`:''}${r.statut==='confirmee'&&!r.paye&&tot>0?pay:''}<button class="btn small ghost" type="button" onclick="App.editRes('${r.id}')">Modifier</button></div></td></tr>`;
 }
@@ -848,7 +879,8 @@ function editRes(id){
     <div class="field"><span class="lbl">Repas</span>${D.menu.map(m=>m.formule?formuleBlock(m,(r.repas||[]).filter(x=>x.id===m.id&&x.choix).map(x=>x.choix)):`<div class="qty"><span class="n">${esc(m.nom)}<small>${eur(m.prix)}${m.dispo?'':' · retiré du menu'}</small></span><input type="number" min="0" max="30" name="q-${m.id}" value="${qty(m.id)}" aria-label="Quantité ${esc(m.nom)}"></div>`).join('')}${extra.length?`<p class="note">Plats supprimés du menu, conservés : ${esc(repasLabel(extra))}</p>`:''}</div>
     <div class="fields2"><div class="field"><label for="er-st">Statut</label><select id="er-st" name="statut">${[['option','Option'],['confirmee','Confirmée'],['annulee','Annulée'],['expiree','Expirée']].map(([k,l])=>`<option value="${k}" ${r.statut===k?'selected':''}>${l}</option>`).join('')}</select></div>
     <div class="field"><label for="er-x">Fin de l'option</label><input id="er-x" name="expires_at" type="datetime-local" value="${localInput(r.expires_at)}"></div></div>
-    <div class="field"><label for="er-m">Règlement</label><select id="er-m" name="moyen"><option value="" ${!r.paye?'selected':''}>Pas encore réglé</option><option value="paypal" ${r.paye&&r.moyen!=='especes'?'selected':''}>Réglé par PayPal</option><option value="especes" ${r.paye&&r.moyen==='especes'?'selected':''}>Réglé en espèces</option></select></div>
+    <div class="field"><label for="er-m">Règlement</label><select id="er-m" name="moyen"><option value="" ${!r.paye?'selected':''}>Pas encore réglé</option><option value="paypal" ${r.paye&&r.moyen==='paypal'?'selected':''}>Réglé par PayPal</option><option value="wero" ${r.paye&&r.moyen==='wero'?'selected':''}>Réglé par Wero</option><option value="especes" ${r.paye&&r.moyen==='especes'?'selected':''}>Réglé en espèces</option></select></div>
+    <div class="field"><label for="er-mp">Moyen choisi par le joueur</label><select id="er-mp" name="mode_paiement">${Object.entries(MODES).map(([k,l])=>`<option value="${k}" ${(r.mode_paiement||'paypal')===k?'selected':''}>${l}</option>`).join('')}</select></div>
     <div class="field"><label for="er-n">Note</label><textarea id="er-n" name="note" maxlength="1000">${esc(r.note)}</textarea></div>
     <div class="row"><button class="btn primary" type="submit">Enregistrer</button>${id?`<button class="btn small ghost" type="button" onclick="App.extend(this,'${id}')">+24 h d'option</button><button class="btn danger" type="button" onclick="App.delRes(this,'${id}')">Supprimer</button>`:''}</div>
   </form>`);
@@ -860,7 +892,7 @@ async function saveRes(e,id){
   (old?.repas||[]).filter(x=>!D.menu.some(m=>m.id===x.id)).forEach(x=>repas.push(x));
   const moyen=f.moyen.value;
   const patch={user_id:f.user_id.value,session_id:f.session_id.value,places:Math.max(1,+f.places.value||1),parts:f.parts.value===''?null:Math.max(0,+f.parts.value),groupe:f.groupe.value.trim(),repas,statut:f.statut.value,
-    expires_at:new Date(f.expires_at.value||Date.now()).toISOString(),paye:!!moyen,moyen,note:f.note.value.trim()};
+    expires_at:new Date(f.expires_at.value||Date.now()).toISOString(),paye:!!moyen,moyen,mode_paiement:f.mode_paiement.value,note:f.note.value.trim()};
   if(f.code) patch.code=f.code.value.trim()?f.code.value.trim().toUpperCase().replace(/\s+/g,'-'):null;
   await run(btn,async()=>{
     if(id){ chk(await sb.from('reservations').update(patch).eq('id',id));
@@ -870,7 +902,7 @@ async function saveRes(e,id){
   });
 }
 async function validate(btn,id,moyen){ const patch={statut:'confirmee'}; if(moyen){patch.paye=true; patch.moyen=moyen;}
-  await run(btn,async()=>{ chk(await sb.from('reservations').update(patch).eq('id',id)); await refresh(); toast(moyen?(moyen==='especes'?'Confirmée, réglée en espèces.':'Confirmée, réglée par PayPal.'):'Réservation validée sans paiement.'); }); }
+  await run(btn,async()=>{ chk(await sb.from('reservations').update(patch).eq('id',id)); await refresh(); toast(moyen?({especes:'Confirmée, réglée en espèces.',paypal:'Confirmée, réglée par PayPal.',wero:'Confirmée, réglée par Wero.'}[moyen]):'Réservation validée sans paiement.'); }); }
 async function extend(btn,id){ const r=mjRes(id); const exp=new Date(Math.max(T(r.expires_at),Date.now())+24*HOUR).toISOString();
   await run(btn,async()=>{ chk(await sb.from('reservations').update({expires_at:exp,statut:r.statut==='expiree'?'option':r.statut}).eq('id',id)); await refresh(); editRes(id); toast('Option prolongée de 24 h.'); }); }
 async function delRes(btn,id){ const n=D.mj.res.filter(x=>x.parent_id===id).length; if(!confirm(n?`Supprimer cette réservation et les ${n} ami(s) qui ont rejoint la table ?`:'Supprimer cette réservation ?')) return;
@@ -1019,6 +1051,7 @@ async function delMenu(btn,id){ if(!confirm('Supprimer ce plat ? Les commandes d
 function mjReglages(){
   const st=D.settings;
   return `<form class="card" style="max-width:640px" onsubmit="App.saveSettings(event)">
+    <div class="field"><label for="st-w">Numéro Wero</label><input id="st-w" name="wero" type="tel" placeholder="06 12 34 56 78" value="${esc(D.mj.wero||'')}"><p class="note">Visible uniquement par les joueurs qui ont une réservation en cours.</p></div>
     <div class="field"><label for="st-p">Lien PayPal.me</label><input id="st-p" name="paypal" type="url" placeholder="https://paypal.me/votre-nom" value="${esc(st.paypal)}"></div>
     <div class="field"><label for="st-pp">Prix par joueur (€)</label><input id="st-pp" name="prix_place" type="number" min="0" step="0.5" value="${st.prix_place??20}"><p class="note">Le même pour toutes les parties : prix d'une place en partie ouverte, et prix par joueur en privatisation (la table coûte ce prix × le nombre de joueurs). En le changeant, les parties à venir prennent le nouveau prix ; les réservations déjà faites gardent le leur.</p></div>
     <div class="field"><label for="st-d">Durée d'une option (heures)</label><input id="st-d" name="duree" type="number" min="1" max="168" value="${st.duree_option}"></div>
@@ -1028,6 +1061,7 @@ function mjReglages(){
 async function saveSettings(e){ e.preventDefault(); const f=e.target; const btn=f.querySelector('[type=submit]');
   const pp=Math.max(0,+f.prix_place.value||0);
   await run(btn,async()=>{ if(pp!==Number(D.settings.prix_place)) chk(await sb.from('sessions').update({prix:pp}).gt('date',new Date().toISOString()));
+    chk(await sb.from('settings_private').update({wero:f.wero.value.trim()}).eq('id',1)); D.wero=undefined;
     chk(await sb.from('settings').update({prix_place:pp,paypal:f.paypal.value.trim(),duree_option:Math.min(168,Math.max(1,Math.round(+f.duree.value||48))),adresse:f.adresse.value.trim()}).eq('id',1)); await refresh(); toast('Réglages enregistrés.'); }); }
 
 /* ---------- Démarrage ---------- */
@@ -1036,7 +1070,7 @@ window.App={planFilter(k){UI.planFilter=k;render();}, scenFilter(k){UI.scenFilte
   reload(btn){run(btn,refresh);},
   openSession,openScenario,closeDrawer,updateTotal,book,declarePaid,toggleDone,signup,login,forgot,sendReset,savePassword,logout,cancelMine,showPay,
   openJoin,joinLookup,joinTotal,joinSubmit,copyCode,
-  validate,editRes,saveRes,extend,delRes,editSess,saveSess,dupSess,delSess,editScen,saveScen,delScen,moveScen,pickImg,clearImg,editMenu,saveMenu,addFormule,formuleCount,removeFormule,toggleMenu,delMenu,saveSettings};
+  validate,setMode,editRes,saveRes,extend,delRes,editSess,saveSess,dupSess,delSess,editScen,saveScen,delScen,moveScen,pickImg,clearImg,editMenu,saveMenu,addFormule,formuleCount,removeFormule,toggleMenu,delMenu,saveSettings};
 
 let first=true;
 sb.auth.onAuthStateChange((ev,session)=>{
