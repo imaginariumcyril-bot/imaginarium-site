@@ -642,7 +642,7 @@ function vScenarios(){
   if(u&&f==='faits') list=list.filter(s=>D.done.has(s.id));
   if(u&&f==='afaire') list=list.filter(s=>!D.done.has(s.id));
   const F=UI.sf; const norm=v=>String(v||'').trim().toLowerCase();
-  const vals=k=>{const m=new Map(); D.scenarios.forEach(x=>{const v=String(x[k]||'').trim(); if(v&&!m.has(norm(v))) m.set(norm(v),v);}); return [...m.entries()].sort((a,b)=>a[1].localeCompare(b[1],'fr'));};
+  const vals=k=>{const m=new Map(); D.scenarios.forEach(x=>{const v=String(x[k]||'').trim(); if(v&&!m.has(norm(v))) m.set(norm(v),v);}); return [...m.entries()].sort((a,b)=>a[1].localeCompare(b[1],'fr',{sensitivity:'base',numeric:true}));};
   if(F.genre) list=list.filter(s=>(s.genre||'scenario')===F.genre);
   ['systeme','niveau'].forEach(k=>{ if(F[k]) list=list.filter(s=>norm(s[k])===F[k]); });
   if(F.ambiance) list=list.filter(s=>plain(s.ambiance).includes(plain(F.ambiance)));
@@ -653,7 +653,7 @@ function vScenarios(){
   const hasCamp=D.scenarios.some(x=>x.genre==='campagne');
   const filtres=D.scenarios.length>1?`<div class="sfilters" role="group" aria-label="Filtrer les scénarios">
     <label class="sf sf-q"><span class="label">Rechercher</span><input id="scen-q" type="search" placeholder="Ex. horreur, Cthulhu, gobelins…" value="${esc(UI.sq||'')}" oninput="App.scenQ(this.value)" autocomplete="off"></label>
-    ${hasCamp?sel('genre','Type',[['scenario','Scénarios'],['campagne','Campagnes']]):''}
+    ${hasCamp?sel('genre','Type',[['campagne','Campagnes'],['scenario','Scénarios']]):''}
     ${vals('systeme').length>1?sel('systeme','Système de jeu',vals('systeme')):''}
     ${vals('ambiance').length>1?sel('ambiance','Ambiance',vals('ambiance')):''}
     ${vals('niveau').length>1?sel('niveau','Niveau',vals('niveau')):''}
