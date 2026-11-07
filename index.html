@@ -119,6 +119,22 @@ main{max-width:1120px;margin:0 auto;padding:28px 16px 80px;display:grid;gap:40px
 .sess.t-ouverte{border-left-color:var(--info)}
 .sess.t-privatisable{border-left-color:var(--brass)}
 .sess.full{opacity:.62}
+details.player{padding:0}
+details.player>summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px}
+details.player>summary::-webkit-details-marker{display:none}
+details.player>summary .sub{display:block;color:var(--muted);font-size:.9rem;overflow-wrap:anywhere}
+details.player .pname{font-family:var(--f-fell);font-size:1.2rem}
+details.player .pmini{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:.9rem}
+details.player .pmini b{color:var(--bone)}
+details.player[open]>summary{border-bottom:1px solid var(--line)}
+details.player .pbody{padding:16px 18px;display:grid;gap:14px}
+details.player h4{font-family:var(--f-label);font-weight:600;letter-spacing:.06em;font-size:.85rem;text-transform:uppercase;color:var(--brass);margin:0 0 8px}
+.pcols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips .pill{white-space:normal}
+.plist{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.plist li{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dotted var(--line);padding:3px 0}
+@media (max-width:700px){.pcols{grid-template-columns:1fr}}
 .sess .thumb{position:relative}
 .sess.st-option{border-left:3px dashed var(--warn)}
 .sess.st-option.full{opacity:.85}
@@ -361,12 +377,13 @@ async function loadUser(){
 }
 async function loadMJ(){
   if(!D.profile?.is_mj){D.mj={res:[],profiles:[],sessions:[]};return;}
-  const [r,p,w,s]=await Promise.all([
+  const [r,p,w,s,dn]=await Promise.all([
     sb.from('reservations').select('*, profiles(pseudo,email)').order('created_at'),
-    sb.from('profiles').select('id,pseudo,email,is_mj').order('pseudo'),
+    sb.from('profiles').select('id,pseudo,email,is_mj,created_at').order('pseudo'),
     sb.from('settings_private').select('wero').eq('id',1).maybeSingle(),
-    sb.rpc('get_planning',{p_depuis:'2000-01-01T00:00:00Z'})]);
-  D.mj={res:chk(r)||[],profiles:chk(p)||[],sessions:(chk(s)||[]).map(normS),wero:(chk(w)||{}).wero||''};
+    sb.rpc('get_planning',{p_depuis:'2000-01-01T00:00:00Z'}),
+    sb.from('scenario_done').select('user_id,scenario_id')]);
+  D.mj={res:chk(r)||[],profiles:chk(p)||[],sessions:(chk(s)||[]).map(normS),wero:(chk(w)||{}).wero||'',done:chk(dn)||[]};
 }
 async function refresh(){
   try{ await loadPublic(); await loadUser(); await loadMJ(); D.loaded=true; }
@@ -860,8 +877,8 @@ function vMJ(){
   const declared=pend.filter(r=>r.paiement_declare).length;
   const future=D.mj.sessions.filter(s=>s.date>Date.now());
   const placesConf=D.mj.res.filter(r=>r.statut==='confirmee'&&!r.parent_id&&(mjSess(r.session_id)?.date||0)>Date.now()).reduce((a,r)=>a+Number(r.places),0);
-  const tabs=[['options','Options à valider',pend.length],['reservations','Toutes les réservations'],['planning','Planning'],['scenarios','Scénarios'],['menu','Menu'],['news','Actualité'],['reglages','Réglages']];
-  const body={options:mjOptions,reservations:mjReservations,planning:mjPlanning,scenarios:mjScenarios,menu:mjMenu,news:mjNews,reglages:mjReglages}[t]();
+  const tabs=[['options','Options à valider',pend.length],['reservations','Toutes les réservations'],['planning','Planning'],['scenarios','Scénarios'],['joueurs','Joueurs'],['menu','Menu'],['news','Actualité'],['reglages','Réglages']];
+  const body={options:mjOptions,reservations:mjReservations,planning:mjPlanning,scenarios:mjScenarios,joueurs:mjJoueurs,menu:mjMenu,news:mjNews,reglages:mjReglages}[t]();
   return `<section style="display:grid;gap:20px">
     <div class="sec-head"><div><span class="label">Espace MJ</span><h2>Le cabinet du docteur</h2></div><button class="btn small ghost" type="button" onclick="App.reload(this)">Actualiser</button></div>
     <div class="stats">
@@ -895,6 +912,57 @@ const resTable=(rows,emptyMsg)=>rows.length?`<div class="tbl-wrap"><table><thead
 function mjOptions(){
   const pend=D.mj.res.filter(r=>r.statut==='option'&&isActive(r)).sort((a,b)=>(b.paiement_declare-a.paiement_declare)||(T(a.expires_at)-T(b.expires_at)));
   return `<div style="display:grid;gap:10px"><p class="muted">Les paiements signalés par les joueurs sont en tête, puis les options qui expirent le plus tôt. « Valider sans paiement » confirme la réservation tout de suite (habitués, règlement sur place) ; vous pourrez noter le paiement plus tard dans « Toutes les réservations ». « PayPal reçu » et « Espèces reçues » confirment et marquent payé.</p>${resTable(pend,'Aucune option en attente.')}</div>`;
+}
+function playerStats(u){
+  const mine=D.mj.res.filter(r=>r.user_id===u.id);
+  const conf=mine.filter(r=>r.statut==='confirmee');
+  const past=conf.filter(r=>(mjSess(r.session_id)?.date||0)<=Date.now());
+  const futur=conf.filter(r=>(mjSess(r.session_id)?.date||0)>Date.now());
+  const paid=mine.filter(r=>r.paye).reduce((a,r)=>a+mjTotal(r),0);
+  const due=conf.filter(r=>!r.paye).reduce((a,r)=>a+mjTotal(r),0);
+  const food={}; let foodTot=0;
+  conf.forEach(r=>(r.repas||[]).forEach(x=>{ food[x.nom]=(food[x.nom]||0)+Number(x.qty||0); foodTot+=Number(x.prix||0)*Number(x.qty||0); }));
+  const done=D.mj.done.filter(d=>d.user_id===u.id).map(d=>scen(d.scenario_id)).filter(Boolean).sort((a,b)=>a.titre.localeCompare(b.titre,'fr'));
+  const played=[...new Set(past.map(r=>{const s=mjSess(r.session_id); return scen(s?.scenario_id||r.scenario_id||(r.parent_id?mjRes(r.parent_id)?.scenario_id:null))?.titre;}).filter(Boolean))];
+  return {mine,past,futur,paid,due,food,foodTot,done,played,last:past.map(r=>mjSess(r.session_id).date).sort((a,b)=>b-a)[0]};
+}
+function mjJoueurs(){
+  const q=plain(UI.pq||'');
+  const list=D.mj.profiles.filter(u=>!q||plain((u.pseudo||'')+' '+(u.email||'')).includes(q)).map(u=>({u,st:playerStats(u)}));
+  const sort=UI.ps||'pseudo';
+  list.sort((a,b)=>sort==='parties'?b.st.past.length-a.st.past.length:sort==='depense'?b.st.paid-a.st.paid:sort==='recent'?T(b.u.created_at)-T(a.u.created_at):(a.u.pseudo||'').localeCompare(b.u.pseudo||'','fr'));
+  const nScen=D.scenarios.length;
+  const card=({u,st})=>{
+    const foods=Object.entries(st.food).sort((a,b)=>b[1]-a[1]);
+    return `<details class="card player" ${UI.popen?.has(u.id)?'open':''} ontoggle="App.pToggle('${u.id}',this.open)"><summary>
+      <span><b class="pname">${esc(u.pseudo||'(sans pseudo)')}</b>${u.is_mj?' <span class="pill brass">MJ</span>':''}<span class="sub">${esc(u.email||'')}</span></span>
+      <span class="pmini num"><span><b>${st.past.length}</b> partie${st.past.length>1?'s':''}</span><span><b>${eur(st.paid)}</b> réglé${st.due>0?` · <span style="color:var(--warn)">${eur(st.due)} à régler</span>`:''}</span><span><b>${st.done.length}</b>/${nScen} cochés</span></span>
+    </summary>
+    <div class="pbody">
+      <div class="stats">
+        <div class="stat"><span class="label">Parties jouées</span><b>${st.past.length}</b></div>
+        <div class="stat"><span class="label">À venir</span><b>${st.futur.length}</b></div>
+        <div class="stat"><span class="label">Total réglé</span><b>${eur(st.paid)}</b></div>
+        <div class="stat"><span class="label">Dont repas</span><b>${eur(st.foodTot)}</b></div>
+      </div>
+      <p class="muted" style="font-size:.92rem">Inscrit le ${u.created_at?fShort(u.created_at):'?'}${st.last?' · dernière partie le '+fShort(st.last):''} · <a href="mailto:${esc(u.email||'')}">Écrire</a></p>
+      <div class="pcols">
+        <div><h4>Scénarios cochés <span class="muted num">(${st.done.length}/${nScen})</span></h4>${st.done.length?`<div class="chips">${st.done.map(x=>`<span class="pill ok">${esc(x.titre)}</span>`).join('')}</div>`:'<p class="muted">Aucun.</p>'}
+          ${st.played.length?`<h4 style="margin-top:12px">Joués à l'Imaginarium</h4><div class="chips">${st.played.map(t=>`<span class="pill brass">${esc(t)}</span>`).join('')}</div>`:''}</div>
+        <div><h4>Ce qu'il a mangé</h4>${foods.length?`<ul class="plist">${foods.map(([n,q])=>`<li><span>${esc(n)}</span><b class="num">× ${q}</b></li>`).join('')}</ul>`:'<p class="muted">Rien pour l\'instant.</p>'}</div>
+      </div>
+      ${st.mine.length?`<div><h4>Ses réservations</h4>${resTable(st.mine.slice().sort((a,b)=>(mjSess(b.session_id)?.date||0)-(mjSess(a.session_id)?.date||0)),'')}</div>`:''}
+    </div></details>`;
+  };
+  const sorts=[['pseudo','Pseudo'],['parties','Parties jouées'],['depense','Total réglé'],['recent','Inscription récente']];
+  return `<div style="display:grid;gap:12px">
+    <div class="row" style="justify-content:space-between;align-items:end">
+      <div class="field" style="flex:1;min-width:220px;margin:0"><label for="pl-q">Rechercher un joueur</label><input id="pl-q" type="search" placeholder="Pseudo ou e-mail" value="${esc(UI.pq||'')}" oninput="App.playerQ(this.value)"></div>
+      <div class="field" style="margin:0"><label for="pl-s">Trier par</label><select id="pl-s" onchange="App.playerSort(this.value)">${sorts.map(([k,l])=>`<option value="${k}" ${sort===k?'selected':''}>${l}</option>`).join('')}</select></div>
+    </div>
+    <p class="muted">${plural(list.length,'compte')} · parties et repas comptés sur les réservations confirmées.</p>
+    ${list.map(card).join('')||'<p class="muted">Aucun joueur trouvé.</p>'}
+  </div>`;
 }
 function mjReservations(){
   const all=D.mj.res.slice().sort((a,b)=>(mjSess(b.session_id)?.date||0)-(mjSess(a.session_id)?.date||0));
@@ -1133,7 +1201,7 @@ async function saveSettings(e){ e.preventDefault(); const f=e.target; const btn=
 
 /* ---------- Démarrage ---------- */
 window.App={planFilter(k){UI.planFilter=k;render();}, scenFilter(k){UI.scenFilter=k;render();}, scenSF(k,v){ if(k===null){ UI.sf={genre:'',systeme:'',ambiance:'',niveau:''}; UI.sq=''; } else UI.sf[k]=v; render(); },
-  scenQ(v){ UI.sq=v; render(); const i=$('#scen-q'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } }, mjTab(k){UI.mjTab=k; if(k!=='news') pendingNews=null; render();},
+  scenQ(v){ UI.sq=v; render(); const i=$('#scen-q'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } }, playerQ(v){ UI.pq=v; render(); const i=$('#pl-q'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } }, playerSort(v){ UI.ps=v; render(); }, pToggle(id,o){ UI.popen=UI.popen||new Set(); o?UI.popen.add(id):UI.popen.delete(id); }, mjTab(k){UI.mjTab=k; if(k!=='news') pendingNews=null; render();},
   reload(btn){run(btn,refresh);},
   openSession,openScenario,closeDrawer,updateTotal,book,declarePaid,toggleDone,signup,login,forgot,sendReset,savePassword,logout,cancelMine,showPay,
   openJoin,joinLookup,joinTotal,joinSubmit,copyCode,
