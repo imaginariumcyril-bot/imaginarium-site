@@ -944,7 +944,7 @@ function mjJoueurs(){
         <div class="stat"><span class="label">Parties jouées</span><b>${st.past.length}</b></div>
         <div class="stat"><span class="label">À venir</span><b>${st.futur.length}</b></div>
         <div class="stat"><span class="label">Total réglé</span><b>${eur(st.paid)}</b></div>
-        <div class="stat"><span class="label">Dont repas</span><b>${eur(st.foodTot)}</b></div>
+        <div class="stat"><span class="label">Repas commandés</span><b>${eur(st.foodTot)}</b></div>
       </div>
       <p class="muted" style="font-size:.92rem">Inscrit le ${u.created_at?fShort(u.created_at):'?'}${st.last?' · dernière partie le '+fShort(st.last):''} · <a href="mailto:${esc(u.email||'')}">Écrire</a></p>
       <div class="pcols">
