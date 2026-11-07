@@ -509,6 +509,14 @@ function vAccueil(){
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 5.5h15a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H10l-4.5 3.5v-3.5h-1a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="9" cy="11" r="1.1" fill="currentColor"/><circle cx="15" cy="11" r="1.1" fill="currentColor"/></svg>
         <span><span class="label">Discord</span><b>Rejoindre le serveur</b></span></a>
     </div>
+    <form class="card" id="msg-form" style="display:grid;gap:12px" onsubmit="App.sendMsg(event)">
+      <h3 style="margin:0">Une question ?</h3>
+      <p class="muted" style="margin:0">Écrivez-moi ici : je reçois votre message par e-mail et je vous réponds directement.</p>
+      <div class="fields2"><div class="field"><label for="msg-nom">Votre nom</label><input id="msg-nom" name="nom" required maxlength="80" autocomplete="name" value="${esc(D.profile?.pseudo||'')}"></div>
+      <div class="field"><label for="msg-mail">Votre e-mail</label><input id="msg-mail" name="email" type="email" required maxlength="200" autocomplete="email" value="${esc(D.profile?.email||D.user?.email||'')}"></div></div>
+      <div class="field"><label for="msg-txt">Votre message</label><textarea id="msg-txt" name="texte" required minlength="3" maxlength="3000" rows="4"></textarea></div>
+      <div class="row"><button class="btn primary" type="submit">Envoyer</button></div>
+    </form>
   </section>`;
 }
 
@@ -1202,7 +1210,7 @@ async function saveSettings(e){ e.preventDefault(); const f=e.target; const btn=
 
 /* ---------- Démarrage ---------- */
 window.App={planFilter(k){UI.planFilter=k;render();}, scenFilter(k){UI.scenFilter=k;render();}, scenSF(k,v){ if(k===null){ UI.sf={genre:'',systeme:'',ambiance:'',niveau:''}; UI.sq=''; } else UI.sf[k]=v; render(); },
-  scenQ(v){ UI.sq=v; render(); const i=$('#scen-q'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } }, playerQ(v){ UI.pq=v; render(); const i=$('#pl-q'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } }, playerSort(v){ UI.ps=v; render(); }, pToggle(id,o){ UI.popen=UI.popen||new Set(); o?UI.popen.add(id):UI.popen.delete(id); }, mjTab(k){UI.mjTab=k; if(k!=='news') pendingNews=null; render();},
+  scenQ(v){ UI.sq=v; render(); const i=$('#scen-q'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } }, playerQ(v){ UI.pq=v; render(); const i=$('#pl-q'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } }, async sendMsg(e){ e.preventDefault(); const f=e.target; const btn=f.querySelector('button[type=submit]'); await run(btn,async()=>{ chk(await sb.rpc('envoyer_message',{p_nom:f.nom.value,p_email:f.email.value,p_texte:f.texte.value})); f.texte.value=''; toast('Message envoyé : je vous réponds au plus vite.'); }); }, playerSort(v){ UI.ps=v; render(); }, pToggle(id,o){ UI.popen=UI.popen||new Set(); o?UI.popen.add(id):UI.popen.delete(id); }, mjTab(k){UI.mjTab=k; if(k!=='news') pendingNews=null; render();},
   reload(btn){run(btn,refresh);},
   openSession,openScenario,closeDrawer,updateTotal,book,declarePaid,toggleDone,signup,login,forgot,sendReset,savePassword,logout,cancelMine,showPay,
   openJoin,joinLookup,joinTotal,joinSubmit,copyCode,
