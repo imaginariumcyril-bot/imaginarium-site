@@ -119,7 +119,8 @@ main{max-width:1120px;margin:0 auto;padding:28px 16px 80px;display:grid;gap:40px
 .sess.t-ouverte{border-left-color:var(--info)}
 .sess.t-privatisable{border-left-color:var(--brass)}
 .sess.full{opacity:.62}
-details.player{padding:0}
+details.player{padding:0;min-width:0}
+details.player .pbody>*{min-width:0}
 details.player>summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px}
 details.player>summary::-webkit-details-marker{display:none}
 details.player>summary .sub{display:block;color:var(--muted);font-size:.9rem;overflow-wrap:anywhere}
@@ -889,7 +890,7 @@ function vMJ(){
     </div>
     ${!D.settings.paypal||!D.mj.wero?`<div class="box brass"><p>${!D.settings.paypal&&!D.mj.wero?'Le lien PayPal et le numéro Wero ne sont pas encore renseignés':!D.settings.paypal?'Le lien PayPal n\'est pas encore renseigné':'Le numéro Wero n\'est pas encore renseigné'} : les joueurs qui choisissent ce moyen ne peuvent pas payer. <button class="btn small" type="button" onclick="App.mjTab('reglages')">Compléter</button></p></div>`:''}
     <div class="tabs" role="tablist">${tabs.map(([k,l,c])=>`<button role="tab" type="button" aria-selected="${t===k}" onclick="App.mjTab('${k}')">${l}${c?`<span class="count num">${c}</span>`:''}</button>`).join('')}</div>
-    <div>${body}</div>
+    <div style="min-width:0">${body}</div>
   </section>`;
 }
 function resRowMJ(r){
@@ -955,7 +956,7 @@ function mjJoueurs(){
     </div></details>`;
   };
   const sorts=[['pseudo','Pseudo'],['parties','Parties jouées'],['depense','Total réglé'],['recent','Inscription récente']];
-  return `<div style="display:grid;gap:12px">
+  return `<div style="display:grid;gap:12px;min-width:0">
     <div class="row" style="justify-content:space-between;align-items:end">
       <div class="field" style="flex:1;min-width:220px;margin:0"><label for="pl-q">Rechercher un joueur</label><input id="pl-q" type="search" placeholder="Pseudo ou e-mail" value="${esc(UI.pq||'')}" oninput="App.playerQ(this.value)"></div>
       <div class="field" style="margin:0"><label for="pl-s">Trier par</label><select id="pl-s" onchange="App.playerSort(this.value)">${sorts.map(([k,l])=>`<option value="${k}" ${sort===k?'selected':''}>${l}</option>`).join('')}</select></div>
