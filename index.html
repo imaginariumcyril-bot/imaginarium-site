@@ -119,6 +119,16 @@ main{max-width:1120px;margin:0 auto;padding:28px 16px 80px;display:grid;gap:40px
 .sess.t-ouverte{border-left-color:var(--info)}
 .sess.t-privatisable{border-left-color:var(--brass)}
 .sess.full{opacity:.62}
+.sess .thumb{position:relative}
+.sess.st-option{border-left:3px dashed var(--warn)}
+.sess.st-option.full{opacity:.85}
+.sess.st-reservee{border-left-color:var(--bad);background:linear-gradient(90deg,rgba(208,106,90,.08),transparent 40%),var(--panel)}
+.sess.st-reservee.full{opacity:.72}
+.stamp{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.stamp span{font-family:var(--f-label);font-weight:700;font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:#f3d9d2;background:rgba(120,30,22,.82);border:1px solid #e8a093;padding:3px 10px;transform:rotate(-8deg);box-shadow:0 2px 8px rgba(0,0,0,.5)}
+.stamp.opt span{color:#2a1608;background:rgba(224,127,69,.9);border-color:#f2b07f;transform:none;letter-spacing:.08em}
+.pill.fill-bad{background:var(--bad);color:#24100c;border-color:var(--bad);font-weight:700}
+.pill.fill-warn{background:transparent;color:var(--warn);border-style:dashed}
 .date{display:grid;justify-items:center;line-height:1}
 .date .dw{font-family:var(--f-label);font-size:.78rem;color:var(--muted);letter-spacing:.08em}
 .date .dd{font-family:var(--f-fell);font-weight:700;font-size:1.9rem}
@@ -386,7 +396,7 @@ function statusPill(r,total){
 function sessState(s){ return s.type==='ouverte'?(s.libres>0?'libre':'complet'):(s.priv_state||'libre'); }
 function sessPill(s){
   if(s.type==='ouverte') return s.libres>0?`<span class="pill info num">${s.libres} place${s.libres>1?'s':''} libre${s.libres>1?'s':''}</span>`:'<span class="pill bad">Complet</span>';
-  return {libre:'<span class="pill brass">Libre à privatiser</span>',option:'<span class="pill warn">Option en cours</span>',reservee:'<span class="pill mute">Privatisée</span>'}[sessState(s)];
+  return {libre:'<span class="pill brass">Libre à privatiser</span>',option:'<span class="pill fill-warn">⏳ Option posée</span>',reservee:'<span class="pill fill-bad">🔒 Privatisée</span>'}[sessState(s)];
 }
 const plain=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 const PRIV_MIN=3; const privMin=sc=>Math.max(PRIV_MIN,sc.min_joueurs||1);
@@ -491,9 +501,9 @@ function sessRow(s){
     pips='<span class="pips" aria-hidden="true">'+Array.from({length:s.places},(_,i)=>`<i class="${i<mine?'mine':i<s.pris?'on':''}"></i>`).join('')+'</span>';
   }
   const full=(s.type==='ouverte'&&s.libres<=0)||(s.type==='privatisable'&&sessState(s)!=='libre');
-  return `<button type="button" class="sess t-${s.type} ${full?'full':''}" onclick="App.openSession('${s.id}')">
+  return `<button type="button" class="sess t-${s.type} st-${sessState(s)} ${full?'full':''}" onclick="App.openSession('${s.id}')">
     <span class="date"><span class="dw">${d.toLocaleDateString('fr-FR',{weekday:'short'})}</span><span class="dd num">${d.getDate()}</span><span class="dm">${d.toLocaleDateString('fr-FR',{month:'short'})}</span></span>
-    <span class="thumb" aria-hidden="true">${sc0?.image_url?`<img src="${esc(sc0.image_url)}" alt="" loading="lazy">`:!effScen(s)?'<img class="choix" src="assets/scenario-au-choix.jpg" alt="" loading="lazy">':'<img class="logo" src="assets/logo-rond.png" alt="">'}</span>
+    <span class="thumb" aria-hidden="true">${sc0?.image_url?`<img src="${esc(sc0.image_url)}" alt="" loading="lazy">`:!effScen(s)?'<img class="choix" src="assets/scenario-au-choix.jpg" alt="" loading="lazy">':'<img class="logo" src="assets/logo-rond.png" alt="">'}${s.type==='privatisable'&&sessState(s)==='reservee'?'<span class="stamp"><span>Privatisée</span></span>':s.type==='privatisable'&&sessState(s)==='option'?'<span class="stamp opt"><span>Option posée</span></span>':''}</span>
     <span><span class="t">${esc(sc.titre)}</span>
       <span class="meta"><span class="num">${fTime(s.date)}</span>${sc.systeme?`<span>· ${esc(sc.systeme)}</span>`:''}<span>· ${s.type==='ouverte'?'Partie ouverte':'Privatisable'}</span>${s.note?`<span class="note-mj" style="flex-basis:100%;margin-top:2px;font-size:.9rem">${esc(s.note)}</span>`:''}</span></span>
     <span class="right">${sessPill(s)}${pips}<span class="muted num" style="font-size:.88rem">${s.type==='ouverte'?eur(s.prix)+' / place':eur(s.prix)+' / joueur'}</span></span>
@@ -529,7 +539,7 @@ function openSession(id,pre){
   ${sc.accroche?`<p class="prose">${esc(sc.accroche)}</p>`:''}${sc.id?`<div class="row"><button class="btn small ghost" type="button" onclick="App.openScenario('${sc.id}')">Lire la fiche ${sc.genre==='campagne'?'de la campagne':'du scénario'}</button></div>`:''}`;
   if(mineRes.length) html+=mineRes.map(r=>`<div class="box brass"><div class="row">${statusPill(r,totalMine(r))}</div><p>${s.type==='ouverte'?'Vous avez déjà '+plural(r.places,'place')+' sur cette partie.':r.parent_id?'Vous avez rejoint cette table privatisée.':'Vous avez privatisé cette table.'}</p><a class="btn small" href="#compte" onclick="App.closeDrawer()">Voir dans mon compte</a></div>`).join('');
   const bookable=sessState(s)==='libre';
-  if(!bookable){ html+=`<div class="box"><p>${s.type==='ouverte'?'Cette partie est complète.':'Ce créneau est déjà privatisé ou sous option.'} Les options non confirmées sont libérées après ${D.settings.duree_option} h : revenez voir.</p>${s.type==='privatisable'&&!mineRes.length?`<p>Un ami a privatisé cette table ? Rejoignez-la avec son code.</p><div class="row"><button class="btn small primary" type="button" onclick="App.openJoin()">J'ai un code de table</button></div>`:''}</div>`; }
+  if(!bookable){ html+=`<div class="box"><p>${s.type==='ouverte'?'Cette partie est complète. Les options non confirmées sont libérées après '+D.settings.duree_option+' h : revenez voir.':sessState(s)==='reservee'?'<b>Cette table est privatisée</b> : la réservation a été confirmée par le MJ.':'<b>Une option est posée sur ce créneau</b>, en attente de paiement ou de validation par le MJ. Si elle n\'est pas confirmée sous '+D.settings.duree_option+' h, le créneau se libère : revenez voir.'}</p>${s.type==='privatisable'&&!mineRes.length?`<p>Un ami a privatisé cette table ? Rejoignez-la avec son code.</p><div class="row"><button class="btn small primary" type="button" onclick="App.openJoin()">J'ai un code de table</button></div>`:''}</div>`; }
   else if(!D.user) html+=loginBox();
   else html+=bookingForm(s,sc);
   openDrawer(auChoix?'Scénario au choix':sc.titre,html); updateTotal();
