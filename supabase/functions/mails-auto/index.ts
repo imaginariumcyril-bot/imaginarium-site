@@ -163,10 +163,76 @@ function composerMJ(kind: string, d: any) {
   };
 }
 
+const fNum = (n: number) => (Math.round(n * 100) / 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+
+// deno-lint-ignore no-explicit-any
+function composerBilan(b: any, vendredi: string) {
+  const [y, m, d] = vendredi.split("-").map(Number);
+  const jour = (k: number) => new Date(Date.UTC(y, m - 1, d + k, 12)).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "long" });
+  const h3 = (t: string) => `<p style="margin:22px 0 8px 0;${F.cinzel};font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#c8924a;">${t}</p>`;
+  const li = (a: string, b2: string) => `<tr><td style="padding:4px 12px 4px 0;border-bottom:1px dotted #33291c;color:#ede5d3;">${a}</td><td align="right" style="padding:4px 0;border-bottom:1px dotted #33291c;color:#ede5d3;white-space:nowrap;"><strong>${b2}</strong></td></tr>`;
+  const tab = (rows: string) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="${F.texte};font-size:16px;line-height:22px;">${rows}</table>`;
+  // deno-lint-ignore no-explicit-any
+  const repas = (r: any[]) => (r || []).map((x) => Array.isArray(x.choix) ? `${esc(x.nom)} : ${x.choix.map(esc).join(", ")}` : `${esc(x.nom)} × ${x.qty}`).join(" ; ") || "pas de repas";
+  // deno-lint-ignore no-explicit-any
+  const sessions = (b.sessions as any[]).map((s) => {
+    // deno-lint-ignore no-explicit-any
+    const js = (s.joueurs as any[]).map((j) => {
+      const qte = s.type === "ouverte" ? `${j.places} pl.` : j.ami ? `${j.parts ?? 0} part(s)` : `${j.places} joueurs`;
+      const reg = j.paye ? "payé" : j.paiement_declare ? "paiement signalé" : j.mode === "especes" ? "espèces sur place" : "à régler";
+      return `<li style="margin:0 0 6px 0;"><strong>${esc(j.pseudo)}</strong>${j.statut === "option" ? ' <span style="color:#e07f45;">(option)</span>' : ""} · ${qte} · ${reg}<br><span style="color:#a89c86;">${repas(j.repas)}</span>${j.note ? `<br><em style="color:#a89c86;">« ${esc(j.note)} »</em>` : ""}</li>`;
+    }).join("");
+    return `<div style="margin:0 0 14px 0;padding:12px 14px;background:#1c1812;border-left:3px solid #c8924a;">
+<strong style="color:#ede5d3;">${esc(quand(s.date))}</strong><br><span style="color:#dcd3bf;">${esc(s.titre)} · ${s.type === "ouverte" ? "partie ouverte" : "privatisation"}</span>
+${js ? `<ul style="margin:10px 0 0 0;padding-left:18px;">${js}</ul>` : `<p style="margin:8px 0 0 0;color:#a89c86;">Aucun joueur inscrit.</p>`}</div>`;
+  }).join("");
+  // deno-lint-ignore no-explicit-any
+  const plats = (b.plats as any[]).map((p) => li(esc(p.plat) + (p.n_option ? ` <span style="color:#a89c86;">(dont ${fNum(p.n_option)} en option)</span>` : ""), "× " + fNum(p.n))).join("");
+  // deno-lint-ignore no-explicit-any
+  const courses = (b.courses as any[]).map((c) => c.q != null && !c.sans_q
+    ? li(esc(c.label) + (c.q % 1 ? ` <span style="color:#a89c86;">(${fNum(c.q)} nécessaires)</span>` : ""), String(Math.ceil(c.q - 1e-9)))
+    : li(esc(c.label) + ` <span style="color:#a89c86;">(pour ${fNum(c.pour)})</span>`, "à prévoir")).join("");
+  const corps = `<p style="margin:0;">Voici le programme du week-end du ${jour(0)} au ${jour(2)}. Réservations confirmées et options en cours.</p>
+${h3("Les parties")}${sessions || '<p style="margin:0;color:#a89c86;">Aucune partie ce week-end.</p>'}
+${h3("À préparer")}${plats ? tab(plats) : '<p style="margin:0;color:#a89c86;">Rien de commandé.</p>'}
+${h3("Liste de courses")}${courses ? tab(courses) : '<p style="margin:0;color:#a89c86;">Rien à acheter.</p>'}`;
+  return {
+    sujet: `Le week-end du ${jour(0)} : ${b.sessions.length} partie${b.sessions.length > 1 ? "s" : ""}, ${b.plats.reduce((a: number, p: { n: number }) => a + Number(p.n), 0)} plat(s) à préparer`,
+    html: coque("Le programme du week-end", corps, "Ouvrir l'espace MJ", "Les quantités sont arrondies au-dessus pour les courses. À consulter à tout moment dans l'espace MJ, onglet Week-end.", `${SITE}/#mj`),
+  };
+}
+
+const uuidDe = async (t: string) => {
+  const h = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)))].slice(0, 16).map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
+};
+
 Deno.serve(async (req) => {
   const secret = req.headers.get("x-cron-secret") ?? "";
   const cle = Deno.env.get("BREVO_API_KEY");
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+  // deno-lint-ignore no-explicit-any
+  const corpsReq: any = await req.json().catch(() => ({}));
+  if (corpsReq?.bilan) {
+    const paris = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
+    if (!corpsReq.force && (paris.getDay() !== 5 || paris.getHours() !== 12)) return Response.json({ bilan: "pas l'heure" });
+    const vendredi = corpsReq.vendredi || `${paris.getFullYear()}-${String(paris.getMonth() + 1).padStart(2, "0")}-${String(paris.getDate()).padStart(2, "0")}`;
+    const b = await db.rpc("mails_bilan", { p_secret: secret, p_vendredi: vendredi });
+    if (b.error) return new Response(JSON.stringify({ erreur: b.error.message }), { status: 401 });
+    if (!cle) return Response.json({ erreur: "BREVO_API_KEY manquante" }, { status: 500 });
+    const ref = await uuidDe("bilan:" + vendredi + (corpsReq.force ? ":" + Date.now() : ""));
+    const pris = (await db.rpc("mails_reserver", { p_secret: secret, p_table: "mj", p_kind: "bilan", p_id: ref })).data === true;
+    if (!pris) return Response.json({ bilan: "déjà envoyé" });
+    const c = composerBilan(b.data, vendredi);
+    const r = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: { "api-key": cle, "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ sender: SENDER, to: (b.data.dest as string[]).map((e) => ({ email: e, name: "MJ" })), subject: c.sujet, htmlContent: c.html }),
+    });
+    if (!r.ok) await db.rpc("mails_liberer", { p_secret: secret, p_table: "mj", p_kind: "bilan", p_id: ref });
+    return Response.json({ bilan: r.ok ? "envoyé" : "échec", statut: r.status });
+  }
 
   const [j, mj] = await Promise.all([
     db.rpc("mails_a_envoyer", { p_secret: secret }),

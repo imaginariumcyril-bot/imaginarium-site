@@ -337,6 +337,16 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const eur=n=>{n=Number(n)||0; return (Math.round(n*100)/100).toLocaleString('fr-FR',{minimumFractionDigits:Math.round(n*100)%100?2:0,maximumFractionDigits:2})+' €';};
 const T=t=>typeof t==='number'?t:Date.parse(t);
 const fDate=t=>new Date(T(t)).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+const parseIng=raw=>{ let t=String(raw||'').trim(); if(!t) return null; let q=null, m;
+  if((m=t.match(/^(\d+)\s*\/\s*(\d+)\s*(.*)$/))){ q=+m[1]/+m[2]; t=m[3]; }
+  else if((m=t.match(/^(?:1|une?)\s+demi[e]?[\s-]+(.*)$/i))){ q=.5; t=m[1]; }
+  else if((m=t.match(/^(\d+(?:[.,]\d+)?)\s*(.*)$/))){ q=+m[1].replace(',','.'); t=m[2]; }
+  else if((m=t.match(/^½\s*(.*)$/))){ q=.5; t=m[1]; }
+  else if((m=t.match(/^(?:une?\s+)?demi[e]?[\s-]+(.*)$/i))){ q=.5; t=m[1]; }
+  else if((m=t.match(/^(?:du|de la|de l'|des|de)\s+(.*)$/i))){ t=m[1]; }
+  t=t.trim(); return t?{q,label:t}:null; };
+const ingTxt=i=>(i.q!=null?String(i.q).replace('.',',')+' ':'')+i.label;
+const fNum=n=>(Math.round(n*100)/100).toLocaleString('fr-FR',{maximumFractionDigits:2});
 const fShort=t=>new Date(T(t)).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
 const fTime=t=>new Date(T(t)).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
 const fDT=t=>fShort(t)+' à '+fTime(t);
@@ -886,8 +896,8 @@ function vMJ(){
   const declared=pend.filter(r=>r.paiement_declare).length;
   const future=D.mj.sessions.filter(s=>s.date>Date.now());
   const placesConf=D.mj.res.filter(r=>r.statut==='confirmee'&&!r.parent_id&&(mjSess(r.session_id)?.date||0)>Date.now()).reduce((a,r)=>a+Number(r.places),0);
-  const tabs=[['options','Options à valider',pend.length],['reservations','Toutes les réservations'],['planning','Planning'],['scenarios','Scénarios'],['joueurs','Joueurs'],['menu','Menu'],['news','Actualité'],['reglages','Réglages']];
-  const body={options:mjOptions,reservations:mjReservations,planning:mjPlanning,scenarios:mjScenarios,joueurs:mjJoueurs,menu:mjMenu,news:mjNews,reglages:mjReglages}[t]();
+  const tabs=[['options','Options à valider',pend.length],['weekend','Week-end'],['reservations','Toutes les réservations'],['planning','Planning'],['scenarios','Scénarios'],['joueurs','Joueurs'],['menu','Menu'],['news','Actualité'],['reglages','Réglages']];
+  const body={options:mjOptions,reservations:mjReservations,planning:mjPlanning,scenarios:mjScenarios,joueurs:mjJoueurs,weekend:mjWeekend,menu:mjMenu,news:mjNews,reglages:mjReglages}[t]();
   return `<section style="display:grid;gap:20px">
     <div class="sec-head"><div><span class="label">Espace MJ</span><h2>Le cabinet du docteur</h2></div><button class="btn small ghost" type="button" onclick="App.reload(this)">Actualiser</button></div>
     <div class="stats">
@@ -922,6 +932,30 @@ function mjOptions(){
   const pend=D.mj.res.filter(r=>r.statut==='option'&&isActive(r)).sort((a,b)=>(b.paiement_declare-a.paiement_declare)||(T(a.expires_at)-T(b.expires_at)));
   return `<div style="display:grid;gap:10px"><p class="muted">Les paiements signalés par les joueurs sont en tête, puis les options qui expirent le plus tôt. « Valider sans paiement » confirme la réservation tout de suite (habitués, règlement sur place) ; vous pourrez noter le paiement plus tard dans « Toutes les réservations ». « PayPal reçu » et « Espèces reçues » confirment et marquent payé.</p>${resTable(pend,'Aucune option en attente.')}</div>`;
 }
+const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+function defaultFriday(){ const d=new Date(); d.setHours(12,0,0,0); const off=(d.getDay()+2)%7; d.setDate(d.getDate()+(off<=2?-off:7-off)); return ymd(d); }
+function shiftFriday(k,w){ const [y,m,dd]=k.split('-').map(Number); const d=new Date(y,m-1,dd,12); d.setDate(d.getDate()+7*w); return ymd(d); }
+async function loadBilan(k,force){ D.bilan=D.bilan||{}; if(D.bilan[k]&&!force) return; D.bilan[k]='…'; try{ D.bilan[k]=chk(await sb.rpc('bilan_weekend',{p_vendredi:k})); }catch(e){ D.bilan[k]=null; toast(errMsg(e)); } if(UI.mjTab==='weekend') render(); }
+function coursesTxt(b){ return b.courses.map(c=>c.q!=null&&!c.sans_q?`${Math.ceil(c.q-1e-9)} ${c.label}${c.q%1?` (${fNum(c.q)} nécessaires)`:''}`:`${c.label} : à prévoir pour ${fNum(c.pour)} ${c.pour>1?'portions':'portion'}`).join('\n'); }
+function mjWeekend(){
+  const k=UI.wk||(UI.wk=defaultFriday()); const b=D.bilan?.[k];
+  if(b===undefined){ loadBilan(k); }
+  const [y,m,dd]=k.split('-').map(Number); const ven=new Date(y,m-1,dd,12), dim=new Date(y,m-1,dd+2,12);
+  const titre=`Week-end du ${ven.toLocaleDateString('fr-FR',{day:'numeric',month:'long'})} au ${dim.toLocaleDateString('fr-FR',{day:'numeric',month:'long'})}`;
+  const nav=`<div class="row" style="justify-content:space-between;align-items:center"><div class="row"><button class="btn small ghost" type="button" onclick="App.wkGo(-1)" aria-label="Week-end précédent">‹</button><h3 style="margin:0">${titre}</h3><button class="btn small ghost" type="button" onclick="App.wkGo(1)" aria-label="Week-end suivant">›</button></div><div class="row">${k!==defaultFriday()?'<button class="btn small" type="button" onclick="App.wkGo(0)">Ce week-end</button>':''}<button class="btn small ghost" type="button" onclick="App.wkReload(this)">Actualiser</button></div></div>
+  <p class="muted" style="margin:0">Vous recevez aussi ce bilan par e-mail chaque vendredi à midi. Il compte les réservations confirmées et les options en cours (signalées « option »).</p>`;
+  if(!b||b==='…') return `<div style="display:grid;gap:14px">${nav}<p class="muted">${b===null?'Impossible de charger le bilan.':'Chargement…'}</p></div>`;
+  const repasTxt=rep=>(rep||[]).map(x=>Array.isArray(x.choix)?`${esc(x.nom)} : ${x.choix.map(esc).join(', ')}`:`${esc(x.nom)} × ${x.qty}`).join('<br>')||'<span class="muted">—</span>';
+  const sess=b.sessions.map(s=>`<div class="card" style="display:grid;gap:10px"><div><b style="font-family:var(--f-fell);font-size:1.15rem">${fDate(s.date)} · ${fTime(s.date)}</b><div class="muted">${esc(s.titre)} · ${s.type==='ouverte'?'partie ouverte, '+s.places+' places':'privatisation'}</div>${s.note?`<div class="note-mj">${esc(s.note)}</div>`:''}</div>
+    ${s.joueurs.length?`<div class="tbl-wrap"><table><thead><tr><th>Joueur</th><th>${s.type==='ouverte'?'Places':'Parts'}</th><th>Repas</th><th>Règlement</th></tr></thead><tbody>${s.joueurs.map(j=>`<tr><td><b>${esc(j.pseudo)}</b>${j.statut==='option'?' <span class="pill warn">option</span>':''}${j.ami?'<div class="sub">ami de la table</div>':''}${j.note?`<div class="sub">« ${esc(j.note)} »</div>`:''}</td><td class="num">${s.type==='ouverte'?j.places:(j.ami?(j.parts??0):`${j.places} joueurs · ${j.parts??j.places} part(s)`)}</td><td>${repasTxt(j.repas)}</td><td>${j.paye?'<span class="pill ok">Payé</span>':j.paiement_declare?'<span class="pill info">Signalé</span>':j.mode==='especes'?'<span class="pill mute">Espèces sur place</span>':'<span class="pill warn">À régler</span>'}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">Aucun joueur inscrit pour l\'instant.</p>'}</div>`).join('');
+  const plats=b.plats.length?`<ul class="plist">${b.plats.map(p=>`<li><span>${esc(p.plat)}${p.n_option?` <span class="muted">(dont ${fNum(p.n_option)} en option)</span>`:''}</span><b class="num">× ${fNum(p.n)}</b></li>`).join('')}</ul>`:'<p class="muted">Rien de commandé.</p>';
+  const courses=b.courses.length?`<ul class="plist">${b.courses.map(c=>`<li><span>${esc(c.label)}${c.q!=null&&c.q%1?` <span class="muted">(${fNum(c.q)} nécessaires)</span>`:''}${c.sans_q?` <span class="muted">(à prévoir pour ${fNum(c.pour)})</span>`:''}</span><b class="num">${c.q!=null&&!c.sans_q?Math.ceil(c.q-1e-9):'✓'}</b></li>`).join('')}</ul><div class="row" style="margin-top:10px"><button class="btn small" type="button" onclick="App.copyCourses()">Copier la liste</button></div>`:'<p class="muted">Rien à acheter.</p>';
+  return `<div style="display:grid;gap:14px;min-width:0">${nav}
+    <div><h3 style="margin:0 0 8px">Les parties</h3>${sess?`<div style="display:grid;gap:12px">${sess}</div>`:'<p class="muted">Aucune partie ce week-end.</p>'}</div>
+    <div class="pcols"><div class="card"><h4 style="font-family:var(--f-label);text-transform:uppercase;letter-spacing:.06em;font-size:.85rem;color:var(--brass);margin:0 0 8px">À préparer</h4>${plats}</div>
+    <div class="card"><h4 style="font-family:var(--f-label);text-transform:uppercase;letter-spacing:.06em;font-size:.85rem;color:var(--brass);margin:0 0 8px">Liste de courses</h4>${courses}</div></div>
+  </div>`;
+}
 function playerStats(u){
   const mine=D.mj.res.filter(r=>r.user_id===u.id);
   const conf=mine.filter(r=>r.statut==='confirmee');
@@ -930,7 +964,7 @@ function playerStats(u){
   const paid=mine.filter(r=>r.paye).reduce((a,r)=>a+mjTotal(r),0);
   const due=conf.filter(r=>!r.paye).reduce((a,r)=>a+mjTotal(r),0);
   const food={}; let foodTot=0;
-  conf.forEach(r=>(r.repas||[]).forEach(x=>{ food[x.nom]=(food[x.nom]||0)+Number(x.qty||0); foodTot+=Number(x.prix||0)*Number(x.qty||0); }));
+  conf.forEach(r=>(r.repas||[]).forEach(x=>{ if(Array.isArray(x.choix)) x.choix.forEach(c=>{const k=x.nom+' · '+c; food[k]=(food[k]||0)+1;}); else food[x.nom]=(food[x.nom]||0)+Number(x.qty||0); foodTot+=Number(x.prix||0)*Number(x.qty||0); }));
   const done=D.mj.done.filter(d=>d.user_id===u.id).map(d=>scen(d.scenario_id)).filter(Boolean).sort((a,b)=>a.titre.localeCompare(b.titre,'fr'));
   const played=[...new Set(past.map(r=>{const s=mjSess(r.session_id); return scen(s?.scenario_id||r.scenario_id||(r.parent_id?mjRes(r.parent_id)?.scenario_id:null))?.titre;}).filter(Boolean))];
   return {mine,past,futur,paid,due,food,foodTot,done,played,last:past.map(r=>mjSess(r.session_id).date).sort((a,b)=>b-a)[0]};
@@ -1158,7 +1192,7 @@ async function delScen(btn,id){ if(D.mj.sessions.some(s=>s.scenario_id===id)){to
 function mjMenu(){
   return `<div style="display:grid;gap:10px"><div class="row" style="justify-content:space-between"><p class="muted">Plat simple : le joueur choisit une quantité. Formule : le joueur choisit un nombre (1, 2, 3…) puis le choix de chacun. Un plat décoché disparaît des réservations sans toucher aux commandes passées.</p><button class="btn primary small" type="button" onclick="App.editMenu(null)">Ajouter un plat</button></div>
   ${D.menu.length?`<div class="tbl-wrap"><table><thead><tr><th>Plat</th><th>Prix</th><th>Proposé</th><th></th></tr></thead><tbody>
-  ${D.menu.map(m=>`<tr><td><b>${esc(m.nom)}</b>${m.formule?' <span class="pill brass">Formule</span>':''}<div class="sub">${esc(m.descr)}</div>${m.formule?`<div class="sub">${m.formule.choix.map(o=>esc(o.nom)).join(' · ')}</div>`:''}</td><td class="num">${m.formule?paliersLabel(m,'<br>'):eur(m.prix)}</td><td><input type="checkbox" aria-label="Proposer ${esc(m.nom)}" ${m.dispo?'checked':''} onchange="App.toggleMenu(this,'${m.id}')"></td><td><button class="btn small ghost" type="button" onclick="App.editMenu('${m.id}')">Modifier</button></td></tr>`).join('')}
+  ${D.menu.map(m=>`<tr><td><b>${esc(m.nom)}</b>${m.formule?' <span class="pill brass">Formule</span>':''}<div class="sub">${esc(m.descr)}</div>${m.formule?`<div class="sub">${m.formule.choix.map(o=>esc(o.nom)+((o.recette||[]).length?'':' <span style="color:var(--warn)">(sans recette)</span>')).join(' · ')}</div>`:`<div class="sub">${(m.recette||[]).length?'Recette : '+esc(m.recette.map(ingTxt).join(', ')):'<span style="color:var(--warn)">Pas de recette : absent de la liste de courses</span>'}</div>`}</td><td class="num">${m.formule?paliersLabel(m,'<br>'):eur(m.prix)}</td><td><input type="checkbox" aria-label="Proposer ${esc(m.nom)}" ${m.dispo?'checked':''} onchange="App.toggleMenu(this,'${m.id}')"></td><td><button class="btn small ghost" type="button" onclick="App.editMenu('${m.id}')">Modifier</button></td></tr>`).join('')}
   </tbody></table></div>`:emptyBox('Aucun plat pour l\'instant.')}</div>`;
 }
 function editMenu(id){
@@ -1168,25 +1202,29 @@ function editMenu(id){
     <div class="field"><label for="em-k">Type</label><select id="em-k" name="kind"><option value="simple" ${fo?'':'selected'}>Plat simple (le joueur choisit une quantité)</option><option value="formule" ${fo?'selected':''}>Formule (nombre au choix, puis un choix par élément)</option></select></div>
     <div class="field"><label for="em-n">Nom</label><input id="em-n" name="nom" type="text" value="${esc(m.nom)}" required maxlength="80"></div>
     <div class="field"><label for="em-d">Description</label><input id="em-d" name="descr" type="text" value="${esc(m.descr)}" maxlength="160"></div>
-    <div class="k-simple" ${fo?'hidden':''}><div class="field"><label for="em-p">Prix (€)</label><input id="em-p" name="prix" type="number" min="0" step="0.5" value="${m.prix}"></div></div>
+    <div class="k-simple" style="display:grid;gap:14px" ${fo?'hidden':''}><div class="field"><label for="em-p">Prix (€)</label><input id="em-p" name="prix" type="number" min="0" step="0.5" value="${m.prix}"></div>
+      <div class="field"><label for="em-r">Recette pour 1 plat (une ligne par ingrédient)</label><textarea id="em-r" name="recette" style="min-height:110px" placeholder="1 munster&#10;2 tranches de jambon blanc&#10;5 röstis">${esc((m.recette||[]).map(ingTxt).join('\n'))}</textarea><p class="note">Commencez par la quantité : « 2 tranches de jambon blanc », « 0,5 mozzarella » ou « demi mozzarella ». Sans quantité (« Nutella »), l'ingrédient est listé « à prévoir ». Sert à la liste de courses du week-end.</p></div></div>
     <div class="k-formule" style="display:grid;gap:14px" ${fo?'':'hidden'}>
       <div class="field"><label for="em-u">Nom d'un élément</label><input id="em-u" name="unite" type="text" value="${esc(fo?.unite||'Croque')}" maxlength="30"></div>
       <div class="field"><label for="em-pa">Prix selon le nombre (une ligne par palier : nombre = prix)</label><textarea id="em-pa" name="paliers" style="min-height:80px">${fo?fo.paliers.map(p=>p.n+' = '+p.prix).join('\n'):'1 = 5\n2 = 9\n3 = 12'}</textarea></div>
       <div class="field"><label for="em-ch">Choix possibles (une ligne par choix : nom : description)</label><textarea id="em-ch" name="choix" style="min-height:100px">${fo?fo.choix.map(o=>o.nom+(o.descr?' : '+o.descr:'')).join('\n'):''}</textarea></div>
+      <div class="field"><label for="em-rc">Recette de chaque choix, pour 1 ${esc((fo?.unite||'croque').toLowerCase().replace(/s$/,''))} (une ligne par choix : nom : ingrédients séparés par « ; »)</label><textarea id="em-rc" name="recettes" style="min-height:100px" placeholder="Montagnard : 2 tranches de pain de campagne ; 2 tranches de raclette">${fo?esc(fo.choix.map(o=>o.nom+' : '+(o.recette||[]).map(ingTxt).join(' ; ')).join('\n')):''}</textarea><p class="note">Quantités comme pour un plat simple (« 0,5 banane », « 5 tomates cerises », « Nutella »). Sert à la liste de courses du week-end.</p></div>
     </div>
     <div class="field"><label for="em-o">Ordre d'affichage</label><input id="em-o" name="position" type="number" value="${m.position||0}"></div>
     <label class="check"><input type="checkbox" name="dispo" ${m.dispo?'checked':''}> Proposé à la réservation</label>
     <div class="row"><button class="btn primary" type="submit">Enregistrer</button>${id?`<button class="btn danger" type="button" onclick="App.delMenu(this,'${id}')">Supprimer</button>`:''}</div></form>`);
 }
 async function saveMenu(e,id){ e.preventDefault(); const f=e.target; const btn=f.querySelector('[type=submit]');
-  const data={nom:f.nom.value.trim(),descr:f.descr.value.trim(),prix:Math.max(0,+f.prix.value||0),dispo:f.dispo.checked,position:Math.round(+f.position.value||0),formule:null};
+  const data={nom:f.nom.value.trim(),descr:f.descr.value.trim(),prix:Math.max(0,+f.prix.value||0),dispo:f.dispo.checked,position:Math.round(+f.position.value||0),formule:null,recette:f.recette.value.split('\n').map(parseIng).filter(Boolean)};
   if(f.kind.value==='formule'){
     const paliers=f.paliers.value.split('\n').map(l=>l.match(/^\s*(\d+)\s*[=:]\s*([\d.,]+)/)).filter(Boolean).map(x=>({n:+x[1],prix:+x[2].replace(',','.')})).filter(p=>p.n>=1&&p.n<=12).sort((a,b)=>a.n-b.n);
     const choix=f.choix.value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const i=l.indexOf(':'); return i>0?{nom:l.slice(0,i).trim(),descr:l.slice(i+1).trim()}:{nom:l,descr:''};});
     if(!paliers.length){toast('Indiquez au moins un palier, par exemple « 1 = 5 ».');return;}
     if(!choix.length){toast('Indiquez au moins un choix.');return;}
     if(new Set(choix.map(c=>c.nom)).size!==choix.length){toast('Deux choix portent le même nom.');return;}
-    data.formule={unite:f.unite.value.trim()||'Choix',paliers,choix}; data.prix=paliers[0].prix;
+    const rec={}; f.recettes.value.split('\n').forEach(l=>{const i=l.indexOf(':'); if(i>0) rec[l.slice(0,i).trim().toLowerCase()]=l.slice(i+1).split(';').map(parseIng).filter(Boolean);});
+    choix.forEach(c=>{ c.recette=rec[c.nom.toLowerCase()]||[]; });
+    data.formule={unite:f.unite.value.trim()||'Choix',paliers,choix}; data.prix=paliers[0].prix; data.recette=[];
   }
   await run(btn,async()=>{ if(id) chk(await sb.from('menu_items').update(data).eq('id',id)); else chk(await sb.from('menu_items').insert(data)); await refresh(); closeDrawer(); toast('Menu mis à jour.'); }); }
 async function toggleMenu(cb,id){ const m=D.menu.find(x=>x.id===id); await run(null,async()=>{ chk(await sb.from('menu_items').update({dispo:!m.dispo}).eq('id',id)); await refresh(); }); }
@@ -1210,7 +1248,7 @@ async function saveSettings(e){ e.preventDefault(); const f=e.target; const btn=
 
 /* ---------- Démarrage ---------- */
 window.App={planFilter(k){UI.planFilter=k;render();}, scenFilter(k){UI.scenFilter=k;render();}, scenSF(k,v){ if(k===null){ UI.sf={genre:'',systeme:'',ambiance:'',niveau:''}; UI.sq=''; } else UI.sf[k]=v; render(); },
-  scenQ(v){ UI.sq=v; render(); const i=$('#scen-q'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } }, playerQ(v){ UI.pq=v; render(); const i=$('#pl-q'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } }, async sendMsg(e){ e.preventDefault(); const f=e.target; const btn=f.querySelector('button[type=submit]'); await run(btn,async()=>{ chk(await sb.rpc('envoyer_message',{p_nom:f.nom.value,p_email:f.email.value,p_texte:f.texte.value})); f.texte.value=''; toast('Message envoyé : je vous réponds au plus vite.'); }); }, playerSort(v){ UI.ps=v; render(); }, pToggle(id,o){ UI.popen=UI.popen||new Set(); o?UI.popen.add(id):UI.popen.delete(id); }, mjTab(k){UI.mjTab=k; if(k!=='news') pendingNews=null; render();},
+  scenQ(v){ UI.sq=v; render(); const i=$('#scen-q'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } }, playerQ(v){ UI.pq=v; render(); const i=$('#pl-q'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } }, async sendMsg(e){ e.preventDefault(); const f=e.target; const btn=f.querySelector('button[type=submit]'); await run(btn,async()=>{ chk(await sb.rpc('envoyer_message',{p_nom:f.nom.value,p_email:f.email.value,p_texte:f.texte.value})); f.texte.value=''; toast('Message envoyé : je vous réponds au plus vite.'); }); }, wkGo(w){ UI.wk=w===0?defaultFriday():shiftFriday(UI.wk||defaultFriday(),w); render(); }, async wkReload(btn){ await loadBilan(UI.wk||defaultFriday(),true); }, copyCourses(){ const b=D.bilan?.[UI.wk]; if(!b||b==='…') return; const t=coursesTxt(b); try{ navigator.clipboard.writeText(t).then(()=>toast('Liste de courses copiée.'),()=>toast('Copie impossible.')); }catch(e){ toast('Copie impossible.'); } }, playerSort(v){ UI.ps=v; render(); }, pToggle(id,o){ UI.popen=UI.popen||new Set(); o?UI.popen.add(id):UI.popen.delete(id); }, mjTab(k){UI.mjTab=k; if(k!=='news') pendingNews=null; render();},
   reload(btn){run(btn,refresh);},
   openSession,openScenario,closeDrawer,updateTotal,book,declarePaid,toggleDone,signup,login,forgot,sendReset,savePassword,logout,cancelMine,showPay,
   openJoin,joinLookup,joinTotal,joinSubmit,copyCode,
