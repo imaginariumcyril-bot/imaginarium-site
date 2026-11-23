@@ -925,7 +925,7 @@ function resRowMJ(r){
     <td>${pl}</td><td><span class="sub">${esc(repasLabel(r.repas))}</span>${r.note?`<div class="sub">« ${esc(r.note)} »</div>`:''}</td>
     <td class="num">${eur(tot)}${tot>0?`<div class="sub">${MODES[mode]}</div>`:''}</td>
     <td><div class="row">${statusPill({...r,date:s?.date},tot)}</div></td>
-    <td><div class="row">${r.statut==='option'&&isActive(r)?`<button class="btn small" type="button" onclick="App.validate(this,'${r.id}','')">Valider sans paiement</button>${tot>0?pay:''}`:''}${r.statut==='confirmee'&&!r.paye&&tot>0?pay:''}<button class="btn small ghost" type="button" onclick="App.editRes('${r.id}')">Modifier</button></div></td></tr>`;
+    <td><div class="row">${r.statut==='option'&&isActive(r)?`<button class="btn small" type="button" onclick="App.validate(this,'${r.id}','')">Valider sans paiement</button>${tot>0?pay:''}`:''}${r.statut==='confirmee'&&!r.paye&&tot>0?pay:''}${!r.parent_id&&isActive(r)&&(r.statut==='option'||r.statut==='confirmee')?`<button class="btn small ghost" type="button" onclick="App.moveRes('${r.id}')">Déplacer</button>`:''}<button class="btn small ghost" type="button" onclick="App.editRes('${r.id}')">Modifier</button></div></td></tr>`;
 }
 const resTable=(rows,emptyMsg)=>rows.length?`<div class="tbl-wrap"><table><thead><tr><th>Joueur</th><th>Partie</th><th>Places</th><th>Repas</th><th>Montant</th><th>Statut</th><th>Actions</th></tr></thead><tbody>${rows.map(resRowMJ).join('')}</tbody></table></div>`:emptyBox(emptyMsg);
 function mjOptions(){
@@ -1057,11 +1057,52 @@ async function extend(btn,id){ const r=mjRes(id); const exp=new Date(Math.max(T(
 async function delRes(btn,id){ const n=D.mj.res.filter(x=>x.parent_id===id).length; if(!confirm(n?`Supprimer cette réservation et les ${n} ami(s) qui ont rejoint la table ?`:'Supprimer cette réservation ?')) return;
   await run(btn,async()=>{ chk(await sb.from('reservations').delete().eq('id',id)); await refresh(); closeDrawer(); toast('Réservation supprimée.'); }); }
 
+const sessOrgs=id=>D.mj.res.filter(r=>r.session_id===id&&!r.parent_id&&isActive(r)&&(r.statut==='option'||r.statut==='confirmee'));
+function targetOptions(src,need){
+  const list=D.mj.sessions.filter(t=>t.id!==src.id&&t.type===src.type&&t.date>Date.now()).sort((a,b)=>a.date-b.date);
+  if(!list.length) return '';
+  return list.map(t=>{ let lab, ok=true;
+    if(t.type==='ouverte'){ ok=t.libres>=need; lab=`${t.libres} place${t.libres>1?'s':''} libre${t.libres>1?'s':''}`; }
+    else { ok=sessState(t)==='libre'; lab=ok?'libre':'déjà pris'; }
+    return `<option value="${t.id}" ${ok?'':'disabled'}>${fShort(t.date)} ${fTime(t.date)} · ${esc(sessTitle(t))} (${lab})</option>`; }).join('');
+}
+const moveNote=`<p class="note">Le prix, les repas, les parts et les règlements suivent. Les rappels repartent sur la nouvelle date. Pour un créneau qui n'existe pas encore, créez-le d'abord dans l'onglet Planning (« Ajouter une partie » ou « +7 j »).</p>`;
+function moveRes(id){
+  const r=mjRes(id); const s=mjSess(r?.session_id); if(!r||!s) return;
+  const friends=D.mj.res.filter(x=>x.parent_id===r.id&&isActive(x));
+  const opts=targetOptions(s,s.type==='ouverte'?Number(r.places):0);
+  openDrawer('Déplacer une réservation',`<form onsubmit="App.saveMove(event,'res','${id}')" style="display:grid;gap:14px">
+    <dl class="facts"><dt>Joueur</dt><dd>${esc(r.profiles?.pseudo||'?')}</dd><dt>Actuellement</dt><dd>${fDate(s.date)} à ${fTime(s.date)} · ${esc(sessTitle(s))}</dd><dt>${s.type==='ouverte'?'Places':'Table'}</dt><dd>${s.type==='ouverte'?r.places:`${r.places} joueurs${friends.length?` · ${plural(friends.length,'ami')} qui sui${friends.length>1?'vent':'t'}`:''}`}</dd></dl>
+    ${opts?`<div class="field"><label for="mv-to">Nouvelle date</label><select id="mv-to" name="to" required><option value="">Choisir…</option>${opts}</select></div>
+    <label class="check"><input type="checkbox" name="notif" checked> Prévenir ${friends.length?'les joueurs':'le joueur'} par e-mail</label>
+    ${moveNote}<div class="row"><button class="btn primary" type="submit">Déplacer</button></div>`:`<div class="box"><p>Aucune autre date ${s.type==='ouverte'?'ouverte':'privatisable'} à venir. Créez-la d'abord dans l'onglet Planning.</p></div>`}
+  </form>`);
+}
+function moveSess(id){
+  const s=mjSess(id); if(!s) return; const orgs=sessOrgs(id);
+  const need=orgs.reduce((a,r)=>a+Number(r.places),0);
+  const opts=targetOptions(s,s.type==='ouverte'?need:0);
+  openDrawer('Reporter une partie',`<form onsubmit="App.saveMove(event,'sess','${id}')" style="display:grid;gap:14px">
+    <p>${fDate(s.date)} à ${fTime(s.date)} · <b>${esc(sessTitle(s))}</b></p>
+    <div><span class="label">Réservations déplacées</span><ul class="plist" style="margin-top:6px">${orgs.map(r=>`<li><span>${esc(r.profiles?.pseudo||'?')}${r.statut==='option'?' <span class="pill warn">option</span>':''}</span><b class="num">${s.type==='ouverte'?plural(Number(r.places),'place'):r.places+' joueurs'}</b></li>`).join('')}</ul></div>
+    ${opts?`<div class="field"><label for="mv-to">Nouvelle date</label><select id="mv-to" name="to" required><option value="">Choisir…</option>${opts}</select></div>
+    <label class="check"><input type="checkbox" name="notif" checked> Prévenir les joueurs par e-mail</label>
+    ${moveNote}<p class="note">L'ancienne date reste au planning, vide : supprimez-la ou gardez-la ouverte à d'autres joueurs.</p>
+    <div class="row"><button class="btn primary" type="submit">Reporter ${plural(orgs.length,'réservation')}</button></div>`:`<div class="box"><p>Aucune date ${s.type==='ouverte'?'ouverte avec assez de places':'privatisable libre'} à venir. Créez-la d'abord (bouton « +7 j » par exemple).</p></div>`}
+  </form>`);
+}
+async function saveMove(e,kind,id){ e.preventDefault(); const f=e.target; const btn=f.querySelector('[type=submit]');
+  if(!f.to.value){ toast('Choisissez la nouvelle date.'); return; }
+  await run(btn,async()=>{
+    if(kind==='res') chk(await sb.rpc('deplacer_reservation',{p_res:id,p_to:f.to.value,p_notifier:f.notif.checked}));
+    else chk(await sb.rpc('deplacer_partie',{p_from:id,p_to:f.to.value,p_notifier:f.notif.checked}));
+    D.bilan={}; await refresh(); closeDrawer(); toast(kind==='res'?'Réservation déplacée'+(f.notif.checked?' : le joueur est prévenu par e-mail.':'.'):'Partie reportée'+(f.notif.checked?' : les joueurs sont prévenus par e-mail.':'.'));
+  }); }
 function mjPlanning(){
   const list=D.mj.sessions.slice().sort((a,b)=>a.date-b.date);
   const fut=list.filter(s=>s.date>=Date.now()-3*HOUR), past=list.filter(s=>s.date<Date.now()-3*HOUR).reverse();
   const row=s=>`<tr><td class="num">${fShort(s.date)}<div class="sub">${fTime(s.date)}</div></td><td>${esc(sessTitle(s))}${s.note?`<div class="sub">${esc(s.note)}</div>`:''}</td><td>${s.type==='ouverte'?'Ouverte':'Privatisable'}</td><td>${s.type==='ouverte'?`<span class="num">${s.pris} / ${s.places}</span>`:s.group_size?`<span class="num">${s.parts_taken} / ${s.group_size} parts</span>`:''} ${sessPill(s)}</td><td class="num">${eur(s.prix)}</td>
-    <td><div class="row"><button class="btn small ghost" type="button" onclick="App.editSess('${s.id}')">Modifier</button><button class="btn small ghost" type="button" onclick="App.dupSess(this,'${s.id}')">+7 j</button></div></td></tr>`;
+    <td><div class="row"><button class="btn small ghost" type="button" onclick="App.editSess('${s.id}')">Modifier</button><button class="btn small ghost" type="button" onclick="App.dupSess(this,'${s.id}')">+7 j</button>${s.date>Date.now()-3*HOUR&&sessOrgs(s.id).length?`<button class="btn small ghost" type="button" onclick="App.moveSess('${s.id}')">Reporter</button>`:''}</div></td></tr>`;
   const head='<thead><tr><th>Date</th><th>Scénario</th><th>Formule</th><th>Remplissage</th><th>Prix</th><th>Actions</th></tr></thead>';
   return `<div style="display:grid;gap:10px"><div class="row" style="justify-content:space-between"><p class="muted">« +7 j » recopie une partie à la semaine suivante, pour remplir le planning vite.</p><button class="btn primary small" type="button" onclick="App.editSess(null)" ${D.scenarios.length?'':'disabled title="Ajoutez d\'abord un scénario"'}>Ajouter une partie</button></div>
   ${!D.scenarios.length?'<p class="note">Ajoutez d\'abord un scénario dans l\'onglet Scénarios.</p>':''}
@@ -1248,7 +1289,7 @@ async function saveSettings(e){ e.preventDefault(); const f=e.target; const btn=
 
 /* ---------- Démarrage ---------- */
 window.App={planFilter(k){UI.planFilter=k;render();}, scenFilter(k){UI.scenFilter=k;render();}, scenSF(k,v){ if(k===null){ UI.sf={genre:'',systeme:'',ambiance:'',niveau:''}; UI.sq=''; } else UI.sf[k]=v; render(); },
-  scenQ(v){ UI.sq=v; render(); const i=$('#scen-q'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } }, playerQ(v){ UI.pq=v; render(); const i=$('#pl-q'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } }, async sendMsg(e){ e.preventDefault(); const f=e.target; const btn=f.querySelector('button[type=submit]'); await run(btn,async()=>{ chk(await sb.rpc('envoyer_message',{p_nom:f.nom.value,p_email:f.email.value,p_texte:f.texte.value})); f.texte.value=''; toast('Message envoyé : je vous réponds au plus vite.'); }); }, wkGo(w){ UI.wk=w===0?defaultFriday():shiftFriday(UI.wk||defaultFriday(),w); render(); }, async wkReload(btn){ await loadBilan(UI.wk||defaultFriday(),true); }, copyCourses(){ const b=D.bilan?.[UI.wk]; if(!b||b==='…') return; const t=coursesTxt(b); try{ navigator.clipboard.writeText(t).then(()=>toast('Liste de courses copiée.'),()=>toast('Copie impossible.')); }catch(e){ toast('Copie impossible.'); } }, playerSort(v){ UI.ps=v; render(); }, pToggle(id,o){ UI.popen=UI.popen||new Set(); o?UI.popen.add(id):UI.popen.delete(id); }, mjTab(k){UI.mjTab=k; if(k!=='news') pendingNews=null; render();},
+  scenQ(v){ UI.sq=v; render(); const i=$('#scen-q'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } }, playerQ(v){ UI.pq=v; render(); const i=$('#pl-q'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } }, async sendMsg(e){ e.preventDefault(); const f=e.target; const btn=f.querySelector('button[type=submit]'); await run(btn,async()=>{ chk(await sb.rpc('envoyer_message',{p_nom:f.nom.value,p_email:f.email.value,p_texte:f.texte.value})); f.texte.value=''; toast('Message envoyé : je vous réponds au plus vite.'); }); }, wkGo(w){ UI.wk=w===0?defaultFriday():shiftFriday(UI.wk||defaultFriday(),w); render(); }, async wkReload(btn){ await loadBilan(UI.wk||defaultFriday(),true); }, copyCourses(){ const b=D.bilan?.[UI.wk]; if(!b||b==='…') return; const t=coursesTxt(b); try{ navigator.clipboard.writeText(t).then(()=>toast('Liste de courses copiée.'),()=>toast('Copie impossible.')); }catch(e){ toast('Copie impossible.'); } }, moveRes,moveSess,saveMove, playerSort(v){ UI.ps=v; render(); }, pToggle(id,o){ UI.popen=UI.popen||new Set(); o?UI.popen.add(id):UI.popen.delete(id); }, mjTab(k){UI.mjTab=k; if(k!=='news') pendingNews=null; render();},
   reload(btn){run(btn,refresh);},
   openSession,openScenario,closeDrawer,updateTotal,book,declarePaid,toggleDone,signup,login,forgot,sendReset,savePassword,logout,cancelMine,showPay,
   openJoin,joinLookup,joinTotal,joinSubmit,copyCode,

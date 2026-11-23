@@ -121,6 +121,19 @@ function composer(m: Mail, s: { paypal?: string; adresse?: string }) {
   }
 }
 
+// deno-lint-ignore no-explicit-any
+function composerDeplacement(d: any, st: { paypal?: string; adresse?: string }) {
+  const m = { ...d, type: "deplacement" } as Mail;
+  const meme = d.ancien_titre === d.titre;
+  return {
+    sujet: `Changement de date : ${d.titre}, ${quand(d.date)}`,
+    html: coque("Votre partie change de date",
+      `<p style="margin:0 0 14px 0;">Bonjour ${esc(d.pseudo || "")},</p><p style="margin:0;">La partie${meme ? "" : ` « ${esc(d.ancien_titre)} »`} prévue le <span style="text-decoration:line-through;color:#a89c86;">${esc(quand(d.ancienne_date))}</span> est déplacée au <strong>${esc(quand(d.date))}</strong>. Votre réservation suit automatiquement${d.paye ? ", et votre règlement aussi" : ""} : vous n'avez rien à refaire.</p>${recap(m, st.adresse || "")}${paiement(m, st.paypal || "")}`,
+      "Voir mes réservations",
+      "Cette nouvelle date ne vous convient pas ? Répondez simplement à cet e-mail."),
+  };
+}
+
 const MODE: Record<string, string> = { paypal: "PayPal", wero: "Wero", especes: "espèces sur place" };
 
 // deno-lint-ignore no-explicit-any
@@ -234,16 +247,19 @@ Deno.serve(async (req) => {
     return Response.json({ bilan: r.ok ? "envoyé" : "échec", statut: r.status });
   }
 
-  const [j, mj] = await Promise.all([
+  const [j, mj, dp] = await Promise.all([
     db.rpc("mails_a_envoyer", { p_secret: secret }),
     db.rpc("mails_mj_a_envoyer", { p_secret: secret }),
+    db.rpc("mails_deplacements", { p_secret: secret }),
   ]);
-  if (j.error || mj.error) return new Response(JSON.stringify({ erreur: (j.error || mj.error)!.message }), { status: 401 });
+  if (j.error || mj.error || dp.error) return new Response(JSON.stringify({ erreur: (j.error || mj.error || dp.error)!.message }), { status: 401 });
+  // deno-lint-ignore no-explicit-any
+  const depl: any[] = dp.data ?? [];
   const mails: Mail[] = j.data?.mails ?? [];
   // deno-lint-ignore no-explicit-any
   const items: { kind: string; ref_id: string; d: any }[] = mj.data?.items ?? [];
   const dest: string[] = mj.data?.dest ?? [];
-  if (!mails.length && !items.length) return Response.json({ envoyes: 0 });
+  if (!mails.length && !items.length && !depl.length) return Response.json({ envoyes: 0 });
   if (!cle) return Response.json({ erreur: "BREVO_API_KEY manquante" }, { status: 500 });
 
   const envoyer = async (to: { email: string; name: string }[], sujet: string, html: string, replyTo = { email: SENDER.email, name: SENDER.name }) => {
@@ -266,6 +282,13 @@ Deno.serve(async (req) => {
     const r = await envoyer([{ email: m.email, name: m.pseudo || m.email }], sujet, html);
     if (!r.ok) await liberer("joueur", m.type, m.id);
     rapport.push({ id: m.id, type: m.type, ...r });
+  }
+  for (const d of depl) {
+    if (!(await reserver("mj", "deplacement", d.id))) continue;
+    const { sujet, html } = composerDeplacement(d, j.data.settings || {});
+    const r = await envoyer([{ email: d.email, name: d.pseudo || d.email }], sujet, html);
+    if (!r.ok) await liberer("mj", "deplacement", d.id);
+    rapport.push({ id: d.id, type: "deplacement", ...r });
   }
   for (const it of items) {
     if (!(await reserver("mj", it.kind, it.ref_id))) continue;
