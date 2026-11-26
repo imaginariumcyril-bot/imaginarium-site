@@ -88,6 +88,18 @@ ul.list li.done .nm{text-decoration:line-through;color:var(--muted)}
 .soon ul{margin:8px 0 0;padding-left:20px}
 .spin{display:inline-block;width:16px;height:16px;border:3px solid currentColor;border-right-color:transparent;border-radius:50%;animation:s 1s linear infinite;vertical-align:-3px;margin-right:6px}
 @keyframes s{to{transform:rotate(360deg)}}
+[hidden]{display:none!important}
+.modal{position:fixed;inset:0;background:rgba(30,25,40,.55);display:grid;place-items:center;padding:14px;z-index:50}
+.mcard{background:var(--card);border-radius:26px;padding:18px;width:min(520px,100%);max-height:calc(100dvh - 28px);overflow:auto}
+#reader{border-radius:18px;overflow:hidden;background:#000;min-height:220px;margin:10px 0}#reader video{width:100%!important;display:block}
+#reader:empty{display:none}
+#manual input{flex:1;width:auto}#manual button{flex:none}
+.favb{padding:8px 12px;min-height:40px;font-size:14px;flex:none}
+.star{border:0;background:transparent;width:44px;height:44px;border-radius:12px;font-size:22px;line-height:1;cursor:pointer;color:var(--muted);flex:none}
+.star[aria-pressed=true]{color:#e0a100}
+.chip.fav{background:var(--butter)}
+.scanbar{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+.code{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 @media(prefers-reduced-motion:reduce){.spin{animation:none}.meter i{transition:none}}
 .scroll{overflow-x:auto}
 @media(max-width:600px){.addf{grid-template-columns:1fr 1fr}.addf input:first-child{grid-column:1/-1}
@@ -164,7 +176,9 @@ table{font-size:14px}.stack thead{display:none}.stack tr{display:grid;padding:8p
         <button class="tab" data-sub="menus" aria-selected="true">Pour les menus</button>
         <button class="tab" data-sub="extras" aria-selected="false">À part</button>
         <button class="tab" data-sub="all" aria-selected="false">Liste complète</button>
+        <button class="tab" data-sub="favs" aria-selected="false">Favoris <small id="fCount"></small></button>
       </div>
+      <div class="scanbar" id="scanbar" hidden><button class="btn main" type="button" id="scanBtn">Scanner un code-barres</button><span class="hint" style="margin:0;align-self:center">avec l'appareil photo du téléphone</span></div>
       <div id="sub-extras-form" hidden>
         <form class="addf" id="addForm" autocomplete="off">
           <input id="x-n" placeholder="Produit (ex. Yaourts nature)" required>
@@ -181,6 +195,20 @@ table{font-size:14px}.stack thead{display:none}.stack tr{display:grid;padding:8p
   <section id="p-budget" hidden><div class="soon"><div class="card"><h2>Budget complet — bientôt</h2><p>Cette partie suivra l'ensemble du budget familial :</p><ul><li>revenus et dépenses fixes du mois</li><li>enveloppes par poste (courses, maison, loisirs…)</li><li>dépenses réelles des courses comparées au budget visé des menus</li></ul></div></div></section>
   <section id="p-edt" hidden><div class="soon"><div class="card" style="background:var(--rose)"><h2>Emploi du temps — bientôt</h2><p>Cette partie regroupera l'organisation de la famille :</p><ul><li>planning de la semaine de chacun</li><li>activités des enfants, rendez-vous</li><li>lien avec les repas (soirs pressés → menus rapides)</li></ul></div></div></section>
 </div>
+
+<div class="modal" id="scan" hidden role="dialog" aria-modal="true" aria-labelledby="scanT"><div class="mcard">
+  <div class="row" style="justify-content:space-between;flex-wrap:nowrap"><h2 id="scanT">Scanner un produit</h2><button class="icon" type="button" id="scanClose" aria-label="Fermer">✕</button></div>
+  <div id="reader"></div>
+  <p class="note" id="scanMsg" style="margin:0 0 10px">Ouverture de la caméra…</p>
+  <form id="manual" class="row" autocomplete="off" style="flex-wrap:nowrap"><input id="m-code" inputmode="numeric" pattern="[0-9]*" placeholder="Ou tapez le code (chiffres sous les barres)"><button class="btn ghost" type="submit">Chercher</button></form>
+  <form id="found" hidden autocomplete="off" style="display:grid;gap:10px;margin-top:12px">
+    <label class="f">Produit<input id="f-n" required maxlength="60"></label>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))"><label class="f">Quantité<input id="f-q" maxlength="30" placeholder="ex. 2"></label><label class="f">Rayon<select id="f-r"></select></label></div>
+    <label style="display:flex;gap:10px;align-items:center;font-weight:700"><input type="checkbox" id="f-fav"> Garder dans mes favoris pour les prochaines courses</label>
+    <div class="code" id="f-code"></div>
+    <div class="row"><button class="btn main" type="submit">Ajouter à la liste</button><button class="btn ghost" type="button" id="again">Scanner un autre</button></div>
+  </form>
+</div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
@@ -241,8 +269,8 @@ function normalize(p){if(!p||!p.settings)return defPlan();const s=p.settings;
   if(!s.start&&s.week){s.start=s.week;s.end=addD(s.week,6);s.shop=addD(s.week,+s.shop||0);const re=/^(\d)-(midi|soir)$/,mv=o=>{const n={};for(const k in o||{}){const m=k.match(re);n[m?addD(s.week,+m[1])+'-'+m[2]:k]=o[k]}return n};p.slots=mv(p.slots);p.meals=mv(p.meals);delete s.week}
   if(!s.start)s.start=nextMonday();if(!s.end||s.end<s.start)s.end=s.start;if(rangeDays(p).slice(-1)[0]<s.end)s.end=addD(s.start,MAXD-1);
   if(typeof s.shop!=='string')s.shop=s.start;p.slots=p.slots||{};p.meals=p.meals||{};p.checked=p.checked||{};ensureSlots(p);return p}
-let plan=defPlan(),extras={items:[]},db=null,sample=null,tab='menus',sub='menus',busyGen=false,pendingRemote=false;
-try{const c=JSON.parse(localStorage.getItem('paf-cache')||'null');if(c){if(c.plan)plan=normalize(c.plan);if(c.extras)extras=c.extras}}catch(e){}
+let favs={items:[]},plan=defPlan(),extras={items:[]},db=null,sample=null,tab='menus',sub='menus',busyGen=false,pendingRemote=false;
+try{const c=JSON.parse(localStorage.getItem('paf-cache')||'null');if(c){if(c.plan)plan=normalize(c.plan);if(c.extras)extras=c.extras;if(c.favs)favs=c.favs}}catch(e){}
 try{tab=localStorage.getItem('paf-tab')||tab}catch(e){}
 
 function dayDate(d){const x=new Date(d+'T12:00:00');return isNaN(x)?'':x.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}
@@ -256,7 +284,7 @@ function fmtQ(q,u){if(u==='g'){q=Math.ceil(q/10)*10;return q>=1000?(q/1000).toLo
   if(u==='ml'){q=Math.ceil(q/10)*10;return q>=1000?(q/1000).toLocaleString('fr-FR',{maximumFractionDigits:1})+' L':q+' ml'}return '× '+Math.max(1,Math.ceil(q-0.05))}
 
 /* ---------- sauvegarde ---------- */
-function cache(){try{localStorage.setItem('paf-cache',JSON.stringify({plan,extras}))}catch(e){}}
+function cache(){try{localStorage.setItem('paf-cache',JSON.stringify({plan,extras,favs}))}catch(e){}}
 const lastSent={};
 function saver(path,get){let t,busy=false,again=false;
   async function run(){if(busy){again=true;return}busy=true;const body=get();lastSent[path]=JSON.stringify(body);saving++;
@@ -265,7 +293,7 @@ function saver(path,get){let t,busy=false,again=false;
     saving--;busy=false;if(again){again=false;run()}}
   return ()=>{cache();clearTimeout(t);t=setTimeout(run,600)}}
 let saving=0;const seen={};
-const savePlan=saver('plan',()=>clone(plan)),saveExtras=saver('extras',()=>clone(extras));
+const savePlan=saver('plan',()=>clone(plan)),saveExtras=saver('extras',()=>clone(extras)),saveFavs=saver('favoris',()=>clone(favs));
 function setSync(t){$('#sync').textContent=t}
 
 /* ---------- rendu ---------- */
@@ -292,16 +320,23 @@ function renderMenu(){const sl=activeSlots(),has=sl.some(s=>plan.meals[s.id]);co
   $('#meter').className='meter'+(total>b?' over':'');$('#meter').firstElementChild.style.width=Math.min(100,b?total/b*100:0)+'%';
   $('#meterLbl').textContent=`Courses le ${longD(plan.settings.shop)}${plan.settings.store?' chez '+plan.settings.store:''} · estimation indicative, hors produits du placard (sel, huile, épices…)`;
   $('#conseil').innerHTML=plan.conseil?`<div class="note">${esc(plan.conseil)}</div>`:''}
-function itemLi(key,name,q,meta,done,kind,del){return `<li class="${done?'done':''}"><label><input type="checkbox" data-${kind}="${esc(key)}" ${done?'checked':''}><span><span class="nm">${esc(name)}</span><br><span class="q">${esc(q)}${meta?' · '+esc(meta):''}</span></span></label>${del?`<button class="icon" data-del="${esc(key)}" aria-label="Supprimer ${esc(name)}">✕</button>`:''}</li>`}
+const favOf=x=>favs.items.find(f=>(x.code&&f.code===x.code)||f.n.toLowerCase()===String(x.n).toLowerCase());
+function starBtn(x,attr){const on=!!favOf(x);return `<button class="star" type="button" ${attr} aria-pressed="${on}" aria-label="${on?'Retirer des':'Mettre en'} favoris : ${esc(x.n)}" title="Favori">${on?'★':'☆'}</button>`}
+function itemLi(key,name,q,meta,done,kind,del,pre){return `<li class="${done?'done':''}"><label><input type="checkbox" data-${kind}="${esc(key)}" ${done?'checked':''}><span><span class="nm">${esc(name)}</span><br><span class="q">${esc(q)}${meta?' · '+esc(meta):''}</span></span></label>${pre||''}${del?`<button class="icon" data-del="${esc(key)}" aria-label="Supprimer ${esc(name)}">✕</button>`:''}</li>`}
 function groups(items){return RAYONS.map(r=>{const its=items.filter(x=>x.r===r);if(!its.length)return '';return `<div class="group"><h3>${esc(r)} <span class="pill">${its.length}</span></h3><ul class="list">${its.map(x=>x.html).join('')}</ul></div>`}).join('')}
 function menuItems(){return aggregate().sort((a,b)=>a.n.localeCompare(b.n,'fr')).map(x=>({r:x.r,done:!!plan.checked[x.k],html:itemLi(x.k,x.n,fmtQ(x.q,x.u)+' · ≈ '+eur(x.p),x.used.join(', '),!!plan.checked[x.k],'mk')}))}
-function extraItems(){return extras.items.map(x=>({r:RAYONS.includes(x.r)?x.r:'Autre',done:!!x.done,html:itemLi(x.id,x.n,x.q||'—','à part',!!x.done,'xk',true)}))}
+function extraItems(){return extras.items.map(x=>({r:RAYONS.includes(x.r)?x.r:'Autre',done:!!x.done,html:itemLi(x.id,x.n,x.q||'—','à part',!!x.done,'xk',true,starBtn(x,`data-star="${esc(x.id)}"`))}))}
+function favsHtml(){if(!favs.items.length)return '<div class="empty">Aucun favori. Touchez ☆ à côté d\'un article « À part », ou cochez « Garder dans mes favoris » après un scan.</div>';
+  return `<div class="row" style="margin-bottom:10px"><button class="btn ghost" type="button" id="favAll">Tout ajouter à la liste</button></div>`+RAYONS.map(r=>{const its=favs.items.filter(f=>(RAYONS.includes(f.r)?f.r:'Autre')===r);if(!its.length)return '';
+    return `<div class="group"><h3>${esc(r)} <span class="pill">${its.length}</span></h3><ul class="list">${its.map(f=>{const inList=extras.items.some(x=>!x.done&&((f.code&&x.code===f.code)||x.n.toLowerCase()===f.n.toLowerCase()));
+      return `<li><span style="flex:1"><span class="nm" style="font-weight:700">${esc(f.n)}</span>${f.q?`<br><span class="q">${esc(f.q)}</span>`:''}${f.code?`<br><span class="code">${esc(f.code)}</span>`:''}</span><button class="btn favb ${inList?'ghost':'main'}" type="button" data-fadd="${esc(f.id)}" ${inList?'disabled':''}>${inList?'✓ Ajouté':'+ Ajouter'}</button><button class="icon" type="button" data-fdel="${esc(f.id)}" aria-label="Retirer ${esc(f.n)} des favoris">✕</button></li>`}).join('')}</ul></div>`}).join('')}
 function renderCourses(){const mi=menuItems(),xi=extraItems();
   document.querySelectorAll('[data-sub]').forEach(b=>b.setAttribute('aria-selected',b.dataset.sub===sub));
-  $('#sub-extras-form').hidden=sub!=='extras';
+  $('#sub-extras-form').hidden=sub!=='extras';$('#scanbar').hidden=!(sub==='extras'||sub==='favs');$('#fCount').textContent=favs.items.length?`(${favs.items.length})`:'';renderChips();
   let html='';
   if(sub==='menus')html=mi.length?groups(mi):'<div class="empty">Générez les menus pour remplir cette liste automatiquement.</div>';
   else if(sub==='extras')html=xi.length?groups(xi):'<div class="empty">Rien à part pour l\'instant. Ajoutez yaourts, gâteaux, produits d\'entretien…</div>';
+  else if(sub==='favs')html=favsHtml();
   else html=(mi.length+xi.length)?groups(mi.concat(xi)):'<div class="empty">La liste est vide.</div>';
   $('#shopList').innerHTML=html;
   const all=mi.concat(xi),done=all.filter(x=>x.done).length;
@@ -363,11 +398,56 @@ $('#menuTbl').addEventListener('click',e=>{const b=e.target.closest('[data-re]')
 document.querySelector('#p-courses .subtabs').addEventListener('click',e=>{const b=e.target.closest('[data-sub]');if(b){sub=b.dataset.sub;renderCourses()}});
 $('#shopList').addEventListener('change',e=>{const t=e.target;if(t.dataset.mk){if(t.checked)plan.checked[t.dataset.mk]=1;else delete plan.checked[t.dataset.mk];savePlan()}
   if(t.dataset.xk){const it=extras.items.find(x=>x.id===t.dataset.xk);if(it){it.done=t.checked;saveExtras()}}renderCourses()});
-$('#shopList').addEventListener('click',e=>{const b=e.target.closest('[data-del]');if(!b)return;extras.items=extras.items.filter(x=>x.id!==b.dataset.del);saveExtras();renderCourses()});
-function addExtra(n,q,r){n=n.trim().slice(0,60);if(!n)return;const ex=extras.items.find(x=>x.n.toLowerCase()===n.toLowerCase()&&!x.done);if(ex){if(q)ex.q=q}else extras.items.push({id:'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),n,q:q.trim().slice(0,30),r,done:false});saveExtras();renderCourses()}
+$('#shopList').addEventListener('click',e=>{const st=e.target.closest('[data-star]');if(st){const it=extras.items.find(x=>x.id===st.dataset.star);if(it)toggleFav(it);return}
+  const fa=e.target.closest('[data-fadd]');if(fa){const f=favs.items.find(x=>x.id===fa.dataset.fadd);if(f)addExtra(f.n,f.q,f.r,f.code);return}
+  const fd=e.target.closest('[data-fdel]');if(fd){favs.items=favs.items.filter(x=>x.id!==fd.dataset.fdel);saveFavs();renderCourses();return}
+  if(e.target.closest('#favAll')){favs.items.forEach(f=>addExtra(f.n,f.q,f.r,f.code));return}
+  const b=e.target.closest('[data-del]');if(!b)return;extras.items=extras.items.filter(x=>x.id!==b.dataset.del);saveExtras();renderCourses()});
+
+/* ---------- scan de code-barres ---------- */
+let scanner=null,handling=false,scanCode='';
+const smsg=t=>{$('#scanMsg').textContent=t};
+function loadLib(){if(window.Html5Qrcode)return Promise.resolve();return new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
+async function stopScan(){const s=scanner;scanner=null;if(s){try{await s.stop()}catch(e){}try{s.clear()}catch(e){}}$('#reader').innerHTML=''}
+async function startCam(){handling=false;$('#found').hidden=true;$('#manual').hidden=false;$('#m-code').value='';smsg('Ouverture de la caméra…');
+  try{await loadLib();const F=window.Html5QrcodeSupportedFormats;
+    scanner=new Html5Qrcode('reader',{verbose:false,formatsToSupport:[F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.ITF],experimentalFeatures:{useBarCodeDetectorIfSupported:true}});
+    await scanner.start({facingMode:'environment'},{fps:12,qrbox:(w,h)=>({width:Math.max(120,Math.min(320,Math.floor(w*.85))),height:Math.max(80,Math.min(170,Math.floor(h*.5)))})},code=>onCode(code),()=>{});
+    smsg('Visez le code-barres dans le cadre, bien à plat et éclairé.')}
+  catch(e){await stopScan();smsg('Caméra indisponible : autorisez l\'accès à l\'appareil photo pour ce site, ou tapez les chiffres du code ci-dessous.')}}
+async function openScan(){$('#scan').hidden=false;$('#f-r').innerHTML=RAYONS.map(r=>`<option>${esc(r)}</option>`).join('');await startCam()}
+async function closeScan(){await stopScan();$('#scan').hidden=true;handling=false}
+async function onCode(code){if(handling)return;handling=true;try{navigator.vibrate&&navigator.vibrate(80)}catch(e){}await stopScan();await lookup(code)}
+function guessRayon(p,host){const c=(p.categories_tags||[]).join(' ');
+  const m=[[/frozen|surgel/,'Surgelés'],[/dair|fromage|cheese|yogurt|yaourt|milk|lait|butter|beurre|eggs|oeufs|cream/,'Crèmerie & frais'],[/beverage|boisson|drink|water|eaux|juice|jus|wine|beer|soda/,'Boissons'],
+    [/bread|pain|viennois|brioche/,'Boulangerie'],[/meat|viande|fish|poisson|seafood|charcut|ham|jambon|poultr|volaille/,'Boucherie & poisson'],[/fruit|vegetable|legume|légume|salad/,'Fruits & légumes'],
+    [/baby|bebe|bébé|infant/,'Bébé'],[/pet-food|animaux|dog|cat-food|chat|chien/,'Animaux']];
+  for(const [re,r] of m)if(re.test(c))return r;return host.includes('beauty')?'Hygiène':host.includes('products')?'Entretien':'Épicerie'}
+async function lookup(raw){const code=String(raw||'').replace(/\D/g,'');if(code.length<6){smsg('Code incomplet : vérifiez les chiffres.');handling=false;return}
+  scanCode=code;$('#manual').hidden=true;smsg('Recherche du produit '+code+'…');
+  const known=favs.items.find(f=>f.code===code)||extras.items.find(x=>x.code===code);let p=null,host='';
+  if(!known)for(const h of ['world.openfoodfacts.org','world.openbeautyfacts.org','world.openproductsfacts.org']){try{const r=await fetch(`https://${h}/api/v2/product/${code}?fields=product_name,product_name_fr,generic_name_fr,brands,quantity,categories_tags`);if(!r.ok)continue;const j=await r.json();if(j&&j.status===1&&j.product){p=j.product;host=h;break}}catch(e){}}
+  const name=known?known.n:p?[String(p.product_name_fr||p.product_name||p.generic_name_fr||'').trim(),String(p.brands||'').split(',')[0].trim()].filter(Boolean).join(' – '):'';
+  $('#f-n').value=name.slice(0,60);$('#f-q').value=known?(known.q||''):'';$('#f-r').value=known?known.r:p?guessRayon(p,host):'Épicerie';
+  $('#f-fav').checked=!!favs.items.find(f=>f.code===code);$('#f-code').textContent='Code-barres '+code+(p&&p.quantity?' · format '+String(p.quantity).slice(0,30):'');
+  $('#found').hidden=false;smsg(known?'Produit déjà connu : vérifiez puis ajoutez.':p?'Produit trouvé. Vérifiez le nom, puis ajoutez-le.':'Produit introuvable dans la base Open Food Facts : donnez-lui un nom, il sera retenu si vous le mettez en favori.');
+  if(!name)$('#f-n').focus()}
+$('#scanBtn').addEventListener('click',openScan);
+$('#scanClose').addEventListener('click',closeScan);
+$('#scan').addEventListener('click',e=>{if(e.target.id==='scan')closeScan()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#scan').hidden)closeScan()});
+$('#manual').addEventListener('submit',async e=>{e.preventDefault();handling=true;await stopScan();await lookup($('#m-code').value)});
+$('#again').addEventListener('click',startCam);
+$('#found').addEventListener('submit',e=>{e.preventDefault();const n=$('#f-n').value.trim();if(!n)return;const q=$('#f-q').value,r=$('#f-r').value,code=scanCode;
+  addExtra(n,q,r,code);const f=favs.items.find(x=>x.code===code);
+  if($('#f-fav').checked){if(f){f.n=n;f.q=q;f.r=r}else favs.items.push({id:uid(),n,q,r,code});saveFavs()}else if(f){favs.items=favs.items.filter(x=>x!==f);saveFavs()}
+  if(sub!=='extras'&&sub!=='favs')sub='extras';renderCourses();closeScan()});
+const uid=()=>'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+function addExtra(n,q,r,code){n=String(n||'').trim().slice(0,60);q=String(q||'').trim().slice(0,30);if(!n)return;const ex=extras.items.find(x=>!x.done&&((code&&x.code===code)||x.n.toLowerCase()===n.toLowerCase()));if(ex){if(q)ex.q=q}else extras.items.push({id:uid(),n,q,r,done:false,...(code?{code}:{})});saveExtras();renderCourses()}
+function toggleFav(x){const f=favOf(x);if(f)favs.items=favs.items.filter(y=>y!==f);else favs.items.push({id:uid(),n:x.n,q:x.q||'',r:x.r,...(x.code?{code:x.code}:{})});saveFavs();renderCourses()}
 $('#addForm').addEventListener('submit',e=>{e.preventDefault();addExtra($('#x-n').value,$('#x-q').value,$('#x-r').value);$('#x-n').value='';$('#x-q').value='';$('#x-n').focus()});
-$('#chips').innerHTML=QUICK.map(([n,r],i)=>`<button class="chip" data-qi="${i}">+ ${esc(n)}</button>`).join('');
-$('#chips').addEventListener('click',e=>{const b=e.target.closest('[data-qi]');if(b){const [n,r]=QUICK[+b.dataset.qi];addExtra(n,'',r)}});
+function renderChips(){$('#chips').innerHTML=favs.items.map(f=>`<button class="chip fav" type="button" data-fq="${esc(f.id)}">★ ${esc(f.n)}</button>`).join('')+QUICK.filter(([n])=>!favs.items.some(f=>f.n.toLowerCase()===n.toLowerCase())).map(([n])=>`<button class="chip" type="button" data-qi="${esc(n)}">+ ${esc(n)}</button>`).join('')}
+$('#chips').addEventListener('click',e=>{const b=e.target.closest('[data-qi],[data-fq]');if(!b)return;if(b.dataset.fq){const f=favs.items.find(x=>x.id===b.dataset.fq);if(f)addExtra(f.n,f.q,f.r,f.code);return}const q=QUICK.find(([n])=>n===b.dataset.qi);if(q)addExtra(q[0],'',q[1])});
 $('#uncheck').addEventListener('click',()=>{plan.checked={};extras.items.forEach(x=>x.done=false);savePlan();saveExtras();renderCourses()});
 $('#copy').addEventListener('click',async()=>{const items=aggregate().map(x=>({r:x.r,t:`${x.n} — ${fmtQ(x.q,x.u)}`,done:plan.checked[x.k]})).concat(extras.items.map(x=>({r:x.r,t:x.n+(x.q?' — '+x.q:''),done:x.done})));
   const txt=`Courses PAF — ${longD(plan.settings.shop)} (du ${dayDate(plan.settings.start)} au ${dayDate(plan.settings.end)})${plan.settings.store?' · '+plan.settings.store:''}\n`+RAYONS.map(r=>{const its=items.filter(x=>x.r===r&&!x.done);return its.length?`\n${r}\n`+its.map(x=>'☐ '+x.t).join('\n'):''}).join('');
@@ -389,7 +469,8 @@ render();
     if(error){setSync('Hors ligne — modifications gardées sur cet appareil');return}
     let changed=false;for(const r of data||[]){if(seen[r.key]===r.updated_at)continue;seen[r.key]=r.updated_at;const js=JSON.stringify(r.body);if(js===lastSent[r.key])continue;
       if(r.key==='plan'&&r.body&&r.body.settings&&r.body.slots){plan=normalize({...defPlan(),...clone(r.body)});changed=true}
-      if(r.key==='extras'&&r.body){extras={items:Array.isArray(r.body.items)?clone(r.body.items):[]};changed=true}}
+      if(r.key==='extras'&&r.body){extras={items:Array.isArray(r.body.items)?clone(r.body.items):[]};changed=true}
+      if(r.key==='favoris'&&r.body){favs={items:Array.isArray(r.body.items)?clone(r.body.items):[]};changed=true}}
     setSync('Synchronisé ✓');if(!changed)return;cache();const a=document.activeElement;if(a&&a.matches('input,select')&&a.type!=='checkbox'){pendingRemote=true;return}render()}
   setSync('Connexion…');await pull();
   setInterval(()=>{if(!document.hidden)pull()},15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)pull()})})();
