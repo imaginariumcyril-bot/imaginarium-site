@@ -899,7 +899,7 @@ function vMJ(){
   const tabs=[['options','Options à valider',pend.length],['weekend','Week-end'],['reservations','Toutes les réservations'],['planning','Planning'],['scenarios','Scénarios'],['joueurs','Joueurs'],['menu','Menu'],['news','Actualité'],['reglages','Réglages']];
   const body={options:mjOptions,reservations:mjReservations,planning:mjPlanning,scenarios:mjScenarios,joueurs:mjJoueurs,weekend:mjWeekend,menu:mjMenu,news:mjNews,reglages:mjReglages}[t]();
   return `<section style="display:grid;gap:20px">
-    <div class="sec-head"><div><span class="label">Espace MJ</span><h2>Le cabinet du docteur</h2></div><button class="btn small ghost" type="button" onclick="App.reload(this)">Actualiser</button></div>
+    <div class="sec-head"><div><span class="label">Espace MJ</span><h2>Le cabinet du docteur</h2></div><div class="row" style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn small ghost" href="/paf.html" style="text-decoration:none">Plan d'Action Famille</a><button class="btn small ghost" type="button" onclick="App.reload(this)">Actualiser</button></div></div>
     <div class="stats">
       <div class="stat"><span class="label">Options en attente</span><b>${pend.length}</b></div>
       <div class="stat"><span class="label">Paiements signalés</span><b style="color:var(--info)">${declared}</b></div>

@@ -1,0 +1,2 @@
+{"name":"Plan d'Action Famille","short_name":"PAF","start_url":"/paf.html","scope":"/paf.html","display":"standalone","background_color":"#fbf6f1","theme_color":"#ffdccb","lang":"fr",
+ "icons":[{"src":"/assets/paf-icon-192.png","sizes":"192x192","type":"image/png"},{"src":"/assets/paf-icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]}
