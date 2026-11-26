@@ -101,14 +101,14 @@ table{font-size:14px}.stack thead{display:none}.stack tr{display:grid;padding:8p
 <body>
 <header><div class="hin">
   <div class="badge" aria-hidden="true">PAF</div>
-  <div><h1>Plan d'Action Famille</h1><div class="sub" id="weekLbl">Semaine</div></div>
+  <div><h1>Plan d'Action Famille</h1><div class="sub" id="weekLbl">Période de courses</div></div>
   <div class="sync" id="sync">Chargement…</div>
   <a class="btn ghost" href="/#mj" style="text-decoration:none">← Espace MJ</a>
 </div></header>
 <div class="wrap" id="gate"><div class="card" style="text-align:center;padding:40px 20px"><h2 id="gateT">Vérification…</h2><p class="hint" id="gateP" style="margin:8px 0 18px">Un instant, on vérifie votre accès.</p><a class="btn main" id="gateA" href="/#mj" hidden style="text-decoration:none;display:inline-block">Se connecter à l'Espace MJ</a></div></div>
 <div class="wrap" id="app" hidden>
   <nav class="tabs" role="tablist">
-    <button class="tab" role="tab" data-tab="menus" aria-selected="true">Menus de la semaine</button>
+    <button class="tab" role="tab" data-tab="menus" aria-selected="true">Menus</button>
     <button class="tab" role="tab" data-tab="courses" aria-selected="false">Courses <small id="cCount"></small></button>
     <button class="tab" role="tab" data-tab="budget" aria-selected="false">Budget <small>bientôt</small></button>
     <button class="tab" role="tab" data-tab="edt" aria-selected="false">Emploi du temps <small>bientôt</small></button>
@@ -116,10 +116,11 @@ table{font-size:14px}.stack thead{display:none}.stack tr{display:grid;padding:8p
 
   <section id="p-menus">
     <div class="card">
-      <h2>La semaine en bref</h2>
-      <p class="hint">Les réglages sont partagés entre les comptes MJ : chacun voit les mêmes menus et la même liste.</p>
+      <h2>La période en bref</h2>
+      <p class="hint">Choisissez la période couverte par ces courses (de 1 à 21 jours). Les réglages sont partagés entre les comptes MJ.</p>
       <div class="grid" id="settings">
-        <label class="f">Semaine du<input type="date" id="s-week"></label>
+        <label class="f">Du<input type="date" id="s-start"></label>
+        <label class="f">Au<input type="date" id="s-end"></label>
         <label class="f">Jour des courses<select id="s-shop"></select></label>
         <label class="f">Budget visé (€)<input type="number" id="s-budget" min="0" step="5" inputmode="decimal"></label>
         <label class="f">Magasin de référence<input id="s-store" list="stores" placeholder="ex. Leclerc"></label>
@@ -142,7 +143,7 @@ table{font-size:14px}.stack thead{display:none}.stack tr{display:grid;padding:8p
     </div>
 
     <div class="card" id="menuCard">
-      <h2>Menus de la semaine</h2>
+      <h2>Menus de la période</h2>
       <div class="kpis" id="kpis"></div>
       <div class="meter" id="meter"><i></i></div>
       <div class="hint" id="meterLbl"></div>
@@ -227,19 +228,30 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const eur=n=>(+n||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
 const clone=o=>JSON.parse(JSON.stringify(o));
 const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const MAXD=21;
+const addD=(s,n)=>{const x=new Date(s+'T12:00:00');x.setDate(x.getDate()+n);return iso(x)};
+const wd=s=>DAYS[(new Date(s+'T12:00:00').getDay()+6)%7]||'';
 function nextMonday(){const d=new Date();d.setHours(12);const k=(8-d.getDay())%7||7;d.setDate(d.getDate()+(d.getDay()===1?0:k));return iso(d)}
-function defPlan(){const slots={};DAYS.forEach((_,d)=>MEALS.forEach(([m])=>{slots[d+'-'+m]={on:m==='soir'||d>=5||d===2,type:d>=5?'saison':(m==='midi'?'equilibre':'rapide'),a:2,e:2}}));
-  return {settings:{week:nextMonday(),shop:5,budget:120,store:'',a:2,e:2},slots,meals:{},checked:{},conseil:''}}
+function defSlot(day,m,a,e){const d=(new Date(day+'T12:00:00').getDay()+6)%7;return {on:m==='soir'||d>=5||d===2,type:d>=5?'saison':(m==='midi'?'equilibre':'rapide'),a,e}}
+function defPlan(){const st=nextMonday();const p={settings:{start:st,end:addD(st,6),shop:addD(st,5),budget:120,store:'',a:2,e:2},slots:{},meals:{},checked:{},conseil:''};ensureSlots(p);return p}
+function rangeDays(p){const s=(p||plan).settings,out=[];if(!s.start||!s.end)return out;for(let i=0;i<MAXD;i++){const d=addD(s.start,i);if(d>s.end)break;out.push(d)}return out}
+function ensureSlots(p){p=p||plan;rangeDays(p).forEach(d=>MEALS.forEach(([m])=>{if(!p.slots[d+'-'+m])p.slots[d+'-'+m]=defSlot(d,m,p.settings.a,p.settings.e)}))}
+// Ancien format (semaine fixe lundi-dimanche) -> période avec dates
+function normalize(p){if(!p||!p.settings)return defPlan();const s=p.settings;
+  if(!s.start&&s.week){s.start=s.week;s.end=addD(s.week,6);s.shop=addD(s.week,+s.shop||0);const re=/^(\d)-(midi|soir)$/,mv=o=>{const n={};for(const k in o||{}){const m=k.match(re);n[m?addD(s.week,+m[1])+'-'+m[2]:k]=o[k]}return n};p.slots=mv(p.slots);p.meals=mv(p.meals);delete s.week}
+  if(!s.start)s.start=nextMonday();if(!s.end||s.end<s.start)s.end=s.start;if(rangeDays(p).slice(-1)[0]<s.end)s.end=addD(s.start,MAXD-1);
+  if(typeof s.shop!=='string')s.shop=s.start;p.slots=p.slots||{};p.meals=p.meals||{};p.checked=p.checked||{};ensureSlots(p);return p}
 let plan=defPlan(),extras={items:[]},db=null,sample=null,tab='menus',sub='menus',busyGen=false,pendingRemote=false;
-try{const c=JSON.parse(localStorage.getItem('paf-cache')||'null');if(c){if(c.plan)plan=c.plan;if(c.extras)extras=c.extras}}catch(e){}
+try{const c=JSON.parse(localStorage.getItem('paf-cache')||'null');if(c){if(c.plan)plan=normalize(c.plan);if(c.extras)extras=c.extras}}catch(e){}
 try{tab=localStorage.getItem('paf-tab')||tab}catch(e){}
 
-function dayDate(d){const x=new Date(plan.settings.week+'T12:00:00');if(isNaN(x))return '';x.setDate(x.getDate()+d);return x.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}
+function dayDate(d){const x=new Date(d+'T12:00:00');return isNaN(x)?'':x.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}
+const longD=d=>{const x=new Date(d+'T12:00:00');return isNaN(x)?'':x.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})};
 function portions(a,e){return (+a||0)+0.6*(+e||0)}
-function activeSlots(){const out=[];DAYS.forEach((_,d)=>MEALS.forEach(([m,lbl])=>{const id=d+'-'+m,s=plan.slots[id];if(s&&s.on)out.push({id,d,m,lbl,...s})}));return out}
+function activeSlots(){const out=[];rangeDays().forEach(d=>MEALS.forEach(([m,lbl])=>{const id=d+'-'+m,s=plan.slots[id];if(s&&s.on)out.push({id,day:d,name:wd(d),m,lbl,...s})}));return out}
 function scaled(id){const meal=plan.meals[id],s=plan.slots[id];if(!meal||!s)return [];const base=portions(meal.a,meal.e)||1,f=portions(s.a,s.e)/base;return (meal.ing||[]).map(x=>({...x,q:x.q*f,p:x.p*f}))}
 function mealCost(id){return scaled(id).reduce((t,x)=>t+(+x.p||0),0)}
-function aggregate(){const map={};activeSlots().forEach(s=>scaled(s.id).forEach(x=>{const k=x.n+'|'+x.u;if(!map[k])map[k]={k,n:x.n,u:x.u,r:RAYONS.includes(x.r)?x.r:'Autre',q:0,p:0,used:[]};map[k].q+=x.q;map[k].p+=x.p;const tag=DAYS[s.d].slice(0,3)+'. '+s.lbl.toLowerCase();if(!map[k].used.includes(tag))map[k].used.push(tag)}));return Object.values(map)}
+function aggregate(){const map={};activeSlots().forEach(s=>scaled(s.id).forEach(x=>{const k=x.n+'|'+x.u;if(!map[k])map[k]={k,n:x.n,u:x.u,r:RAYONS.includes(x.r)?x.r:'Autre',q:0,p:0,used:[]};map[k].q+=x.q;map[k].p+=x.p;const tag=s.name.slice(0,3)+'. '+dayDate(s.day)+' '+s.lbl.toLowerCase();if(!map[k].used.includes(tag))map[k].used.push(tag)}));return Object.values(map)}
 function fmtQ(q,u){if(u==='g'){q=Math.ceil(q/10)*10;return q>=1000?(q/1000).toLocaleString('fr-FR',{maximumFractionDigits:1})+' kg':q+' g'}
   if(u==='ml'){q=Math.ceil(q/10)*10;return q>=1000?(q/1000).toLocaleString('fr-FR',{maximumFractionDigits:1})+' L':q+' ml'}return '× '+Math.max(1,Math.ceil(q-0.05))}
 
@@ -257,28 +269,28 @@ const savePlan=saver('plan',()=>clone(plan)),saveExtras=saver('extras',()=>clone
 function setSync(t){$('#sync').textContent=t}
 
 /* ---------- rendu ---------- */
-function renderSettings(){const s=plan.settings;$('#s-week').value=s.week;$('#s-shop').innerHTML=DAYS.map((d,i)=>`<option value="${i}"${i==s.shop?' selected':''}>${d}</option>`).join('');
+function renderSettings(){const s=plan.settings,days=rangeDays();$('#s-start').value=s.start;$('#s-end').value=s.end;$('#s-end').min=s.start;$('#s-end').max=addD(s.start,MAXD-1);
+  const opts=days.includes(s.shop)?days:[s.shop,...days];$('#s-shop').innerHTML=opts.map(d=>`<option value="${d}"${d===s.shop?' selected':''}>${esc(wd(d))} ${esc(dayDate(d))}${days.includes(d)?'':' (hors période)'}</option>`).join('');
   $('#s-budget').value=s.budget;$('#s-store').value=s.store;$('#s-a').value=s.a;$('#s-e').value=s.e;
-  const x=new Date(s.week+'T12:00:00'),y=new Date(x);y.setDate(y.getDate()+6);
-  $('#weekLbl').textContent=isNaN(x)?'Semaine':`Semaine du ${x.toLocaleDateString('fr-FR',{day:'numeric',month:'long'})} au ${y.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}`}
-function renderSlots(){$('#slots tbody').innerHTML=DAYS.map((day,d)=>`<tr class="${d==plan.settings.shop?'shop':''}"><td class="day"><b>${day}</b><span>${esc(dayDate(d))}${d==plan.settings.shop?' · courses':''}</span></td>`+MEALS.map(([m,lbl])=>{const id=d+'-'+m,s=plan.slots[id];
+  $('#weekLbl').textContent=`Du ${longD(s.start)} au ${longD(s.end)} · ${days.length} jour${days.length>1?'s':''}`}
+function renderSlots(){$('#slots tbody').innerHTML=rangeDays().map(d=>{const day=wd(d);return `<tr class="${d===plan.settings.shop?'shop':''}"><td class="day"><b>${day}</b><span>${esc(dayDate(d))}${d===plan.settings.shop?' · courses':''}</span></td>`+MEALS.map(([m,lbl])=>{const id=d+'-'+m,s=plan.slots[id];
   return `<td><div class="slot${s.on?'':' off'}"><input type="checkbox" data-id="${id}" data-k="on" ${s.on?'checked':''} aria-label="${day} ${lbl} prévu">
   <select data-id="${id}" data-k="type" aria-label="Type ${day} ${lbl}" ${s.on?'':'disabled'}>${Object.entries(TYPES).map(([k,v])=>`<option value="${k}"${k===s.type?' selected':''}>${v}</option>`).join('')}</select>
   <input type="number" min="0" max="20" data-id="${id}" data-k="a" value="${+s.a}" aria-label="Adultes ${day} ${lbl}" title="Adultes" ${s.on?'':'disabled'}>
   <input type="number" min="0" max="20" data-id="${id}" data-k="e" value="${+s.e}" aria-label="Enfants ${day} ${lbl}" title="Enfants" ${s.on?'':'disabled'}>
-  <span></span><span></span><span class="mini">A</span><span class="mini">E</span></div></td>`}).join('')+'</tr>').join('');
+  <span></span><span></span><span class="mini">A</span><span class="mini">E</span></div></td>`}).join('')+'</tr>'}).join('');
   const n=activeSlots().length;$('#genHint').textContent=`${n} repas prévu${n>1?'s':''}`+' · menus tirés du carnet de recettes'}
 function renderMenu(){const sl=activeSlots(),has=sl.some(s=>plan.meals[s.id]);const card=$('#menuCard');
   if(!has){$('#menuTbl tbody').innerHTML='';$('#kpis').innerHTML='';$('#meter').style.display='none';$('#meterLbl').textContent='';
-    $('#conseil').innerHTML='<div class="empty">Aucun menu pour l\'instant. Réglez la semaine puis cliquez sur « Générer les menus ».</div>';return}
+    $('#conseil').innerHTML='<div class="empty">Aucun menu pour l\'instant. Réglez la période puis cliquez sur « Générer les menus ».</div>';return}
   $('#meter').style.display='';
   $('#menuTbl tbody').innerHTML=sl.map(s=>{const m=plan.meals[s.id];const ppl=`${+s.a} A · ${+s.e} E`;
-    if(!m)return `<tr><td><b>${DAYS[s.d]}</b></td><td>${s.lbl}</td><td class="det">Pas encore de menu</td><td><span class="pill t-${s.type}">${TYPES[s.type]}</span></td><td>${ppl}</td><td class="num">—</td><td><button class="icon" data-re="${s.id}" aria-label="Proposer un menu">↻</button></td></tr>`;
-    return `<tr><td><b>${DAYS[s.d]}</b></td><td>${s.lbl}</td><td><div class="plat">${esc(m.plat)}</div><div class="det">${esc(m.detail)}</div></td><td><span class="pill t-${s.type}">${TYPES[s.type]}</span></td><td style="white-space:nowrap">${ppl}</td><td class="num">${eur(mealCost(s.id))}</td><td><button class="icon" data-re="${s.id}" aria-label="Changer ce menu" title="Proposer un autre plat">↻</button></td></tr>`}).join('');
+    if(!m)return `<tr><td><b>${s.name}</b><br><span class="det">${esc(dayDate(s.day))}</span></td><td>${s.lbl}</td><td class="det">Pas encore de menu</td><td><span class="pill t-${s.type}">${TYPES[s.type]}</span></td><td>${ppl}</td><td class="num">—</td><td><button class="icon" data-re="${s.id}" aria-label="Proposer un menu">↻</button></td></tr>`;
+    return `<tr><td><b>${s.name}</b><br><span class="det">${esc(dayDate(s.day))}</span></td><td>${s.lbl}</td><td><div class="plat">${esc(m.plat)}</div><div class="det">${esc(m.detail)}</div></td><td><span class="pill t-${s.type}">${TYPES[s.type]}</span></td><td style="white-space:nowrap">${ppl}</td><td class="num">${eur(mealCost(s.id))}</td><td><button class="icon" data-re="${s.id}" aria-label="Changer ce menu" title="Proposer un autre plat">↻</button></td></tr>`}).join('');
   const total=sl.reduce((t,s)=>t+mealCost(s.id),0),b=+plan.settings.budget||0,ppl=sl.reduce((t,s)=>t+(+s.a)+(+s.e),0);
   $('#kpis').innerHTML=`<div class="kpi"><b>${eur(total)}</b><span>Coût estimé des menus</span></div><div class="kpi"><b>${eur(b)}</b><span>Budget visé</span></div><div class="kpi"><b style="color:${total>b?'var(--warn)':'var(--ok)'}">${total>b?'+ ':''}${eur(Math.abs(total-b))}</b><span>${total>b?'Au-dessus du budget':'Marge restante'}</span></div><div class="kpi"><b>${ppl?eur(total/ppl):'—'}</b><span>Par couvert</span></div>`;
   $('#meter').className='meter'+(total>b?' over':'');$('#meter').firstElementChild.style.width=Math.min(100,b?total/b*100:0)+'%';
-  $('#meterLbl').textContent=`Courses le ${DAYS[plan.settings.shop].toLowerCase()}${plan.settings.store?' chez '+plan.settings.store:''} · estimation indicative, hors produits du placard (sel, huile, épices…)`;
+  $('#meterLbl').textContent=`Courses le ${longD(plan.settings.shop)}${plan.settings.store?' chez '+plan.settings.store:''} · estimation indicative, hors produits du placard (sel, huile, épices…)`;
   $('#conseil').innerHTML=plan.conseil?`<div class="note">${esc(plan.conseil)}</div>`:''}
 function itemLi(key,name,q,meta,done,kind,del){return `<li class="${done?'done':''}"><label><input type="checkbox" data-${kind}="${esc(key)}" ${done?'checked':''}><span><span class="nm">${esc(name)}</span><br><span class="q">${esc(q)}${meta?' · '+esc(meta):''}</span></span></label>${del?`<button class="icon" data-del="${esc(key)}" aria-label="Supprimer ${esc(name)}">✕</button>`:''}</li>`}
 function groups(items){return RAYONS.map(r=>{const its=items.filter(x=>x.r===r);if(!its.length)return '';return `<div class="group"><h3>${esc(r)} <span class="pill">${its.length}</span></h3><ul class="list">${its.map(x=>x.html).join('')}</ul></div>`}).join('')}
@@ -288,14 +300,14 @@ function renderCourses(){const mi=menuItems(),xi=extraItems();
   document.querySelectorAll('[data-sub]').forEach(b=>b.setAttribute('aria-selected',b.dataset.sub===sub));
   $('#sub-extras-form').hidden=sub!=='extras';
   let html='';
-  if(sub==='menus')html=mi.length?groups(mi):'<div class="empty">Générez les menus de la semaine pour remplir cette liste automatiquement.</div>';
+  if(sub==='menus')html=mi.length?groups(mi):'<div class="empty">Générez les menus pour remplir cette liste automatiquement.</div>';
   else if(sub==='extras')html=xi.length?groups(xi):'<div class="empty">Rien à part pour l\'instant. Ajoutez yaourts, gâteaux, produits d\'entretien…</div>';
   else html=(mi.length+xi.length)?groups(mi.concat(xi)):'<div class="empty">La liste est vide.</div>';
   $('#shopList').innerHTML=html;
   const all=mi.concat(xi),done=all.filter(x=>x.done).length;
   $('#progBar').style.width=(all.length?done/all.length*100:0)+'%';$('#progLbl').textContent=`${done} / ${all.length} article${all.length>1?'s':''} dans le caddie`;
   $('#cCount').textContent=all.length?`(${all.length-done})`:'';
-  $('#shopHint').textContent=`Courses le ${DAYS[plan.settings.shop].toLowerCase()} ${dayDate(plan.settings.shop)}${plan.settings.store?' · '+plan.settings.store:''}`;
+  $('#shopHint').textContent=`Courses le ${longD(plan.settings.shop)} · période du ${dayDate(plan.settings.start)} au ${dayDate(plan.settings.end)}${plan.settings.store?' · '+plan.settings.store:''}`;
   $('#x-r').innerHTML=RAYONS.map(r=>`<option${r==='Crèmerie & frais'?' selected':''}>${esc(r)}</option>`).join('')}
 function renderTabs(){document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab));['menus','courses','budget','edt'].forEach(t=>$('#p-'+t).hidden=t!==tab)}
 function render(){renderTabs();renderSettings();renderSlots();renderMenu();renderCourses()}
@@ -305,13 +317,13 @@ function bankMeal(s,avoid){const pool=R.filter(r=>r.t.includes(s.type)&&!avoid.i
   const P=portions(s.a,s.e)||1;return {plat:pick.n,detail:pick.d,a:+s.a,e:+s.e,src:'carnet',ing:pick.i.map(([n,q])=>{const c=C[n];return {n,u:c[0],r:c[1],q:q*P,p:q*P*c[2]}})}}
 function cleanMeal(m,s){if(!m||typeof m.plat!=='string')return null;const ing=Array.isArray(m.ingredients)?m.ingredients:[];
   return {plat:m.plat.slice(0,90),detail:String(m.detail||'').slice(0,120),a:+s.a,e:+s.e,src:'claude',ing:ing.filter(x=>x&&x.n).slice(0,25).map(x=>({n:String(x.n).slice(0,50).trim(),u:['g','ml','u'].includes(x.u)?x.u:'u',r:RAYONS.includes(x.r)?x.r:'Autre',q:Math.max(0,+x.q||0),p:Math.max(0,+x.p||0)}))}}
-function rules(){const st=plan.settings;const month=MONTHS[new Date(st.week+'T12:00:00').getMonth()]||MONTHS[new Date().getMonth()];
-  return `Tu prépares les menus d'une famille française. Mois : ${month}. Magasin de référence : ${st.store||'un supermarché français classique'}. Courses prévues le ${DAYS[st.shop]}.
+function rules(){const st=plan.settings;const month=MONTHS[new Date(st.start+'T12:00:00').getMonth()]||MONTHS[new Date().getMonth()];
+  return `Tu prépares les menus d'une famille française. Mois : ${month}. Magasin de référence : ${st.store||'un supermarché français classique'}. Courses prévues le ${longD(st.shop)}.
 Règles :
 - Pour chaque repas : un plat principal ("plat", court) et un accompagnement ou dessert simple ("detail", 12 mots max).
 - Types : Rapide = prêt en moins de 25 min ; De saison = fruits et légumes de saison en France en ${month} ; Équilibré = légumes + protéine + féculent, peu gras.
 - Les enfants mangent environ 0,6 portion adulte. Plats appréciés des enfants.
-- Les repas avec produits très frais (poisson, salade, viande hachée) se placent dans les 3 jours suivant les courses du ${DAYS[st.shop]} ; avant les courses, privilégie des produits qui se conservent.
+- Les repas avec produits très frais (poisson, salade, viande hachée) se placent dans les 3 jours suivant les courses ; avant les courses, privilégie des produits qui se conservent.
 - Varie les plats, ne répète pas un plat, réutilise les mêmes ingrédients entre repas pour limiter le gaspillage.
 - Ingrédients avec quantité totale pour le repas : n (nom court, identique d'un repas à l'autre, ex "Carottes"), q (nombre), u ("g", "ml" ou "u"), r (un rayon parmi : ${RAYONS.slice(0,7).join(', ')}), p (prix estimé en euros pour cette quantité, au prix habituel du magasin).
 - N'inclus pas les basiques du placard : sel, poivre, huile, vinaigre, épices, herbes sèches, farine, sucre, bouillon.`}
@@ -319,7 +331,7 @@ async function generate(){if(busyGen)return;const sl=activeSlots();const msg=$('
   if(!sl.length){msg.innerHTML='<div class="note err">Cochez au moins un repas.</div>';return}
   busyGen=true;$('#gen').disabled=true;msg.innerHTML=`<div class="note"><span class="spin"></span>Préparation des menus…</div>`;
   const st=plan.settings;let meals=null,conseil='',fallback='';
-  if(sample){try{const list=sl.map(s=>`${s.id} | ${DAYS[s.d]} ${s.lbl.toLowerCase()} | ${TYPES[s.type]} | ${+s.a} adulte(s), ${+s.e} enfant(s)`).join('\n');
+  if(sample){try{const list=sl.map(s=>`${s.id} | ${s.name} ${dayDate(s.day)} ${s.lbl.toLowerCase()} | ${TYPES[s.type]} | ${+s.a} adulte(s), ${+s.e} enfant(s)`).join('\n');
       const prompt=rules()+`\n- Budget total visé : ${+st.budget||0} € pour l'ensemble de la semaine ; le total des prix doit rester en dessous.\n\nRepas à prévoir (id | jour repas | type | convives) :\n${list}\n\nRéponds uniquement en JSON : {"repas":[{"id":"0-soir","plat":"...","detail":"...","ingredients":[{"n":"...","q":0,"u":"g","r":"...","p":0}]}],"conseil":"une phrase d'astuce d'organisation pour la semaine"}`;
       const v=await sample.json(prompt,{modelTier:'default'});const arr=v&&Array.isArray(v.repas)?v.repas:[];meals={};
       sl.forEach(s=>{const m=cleanMeal(arr.find(x=>x&&x.id===s.id),s);if(m)meals[s.id]=m});
@@ -329,16 +341,18 @@ async function generate(){if(busyGen)return;const sl=activeSlots();const msg=$('
   sl.forEach(s=>{if(!meals[s.id]){const m=bankMeal(s,Object.values(meals).map(x=>x.plat));meals[s.id]=m}});
   plan.meals=meals;plan.conseil=conseil;plan.checked={};savePlan();busyGen=false;$('#gen').disabled=false;
   msg.innerHTML=fallback?`<div class="note">${esc(fallback)}</div>`:'';renderMenu();renderCourses();renderSlots();$('#menuCard').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})}
-async function reroll(id,btn){const s={...plan.slots[id],id,d:+id.split('-')[0]};const others=Object.entries(plan.meals).filter(([k])=>k!==id).map(([,m])=>m.plat);const cur=plan.meals[id]?plan.meals[id].plat:'';
+async function reroll(id,btn){const day=id.slice(0,10),s={...plan.slots[id],id,day,name:wd(day)};const others=Object.entries(plan.meals).filter(([k])=>k!==id).map(([,m])=>m.plat);const cur=plan.meals[id]?plan.meals[id].plat:'';
   btn.disabled=true;btn.innerHTML='<span class="spin" style="margin:0"></span>';let m=null;
-  if(sample){try{const prompt=rules()+`\n\nPropose UN repas pour : ${DAYS[s.d]} ${id.endsWith('midi')?'midi':'soir'}, type ${TYPES[s.type]}, ${+s.a} adulte(s) et ${+s.e} enfant(s). Budget raisonnable (~${eur((+plan.settings.budget||0)/Math.max(1,activeSlots().length))}). À éviter (déjà prévus) : ${[cur,...others].filter(Boolean).join(' ; ')}.\nRéponds uniquement en JSON : {"plat":"...","detail":"...","ingredients":[{"n":"...","q":0,"u":"g","r":"...","p":0}]}`;
+  if(sample){try{const prompt=rules()+`\n\nPropose UN repas pour : ${s.name} ${dayDate(s.day)} ${id.endsWith('midi')?'midi':'soir'}, type ${TYPES[s.type]}, ${+s.a} adulte(s) et ${+s.e} enfant(s). Budget raisonnable (~${eur((+plan.settings.budget||0)/Math.max(1,activeSlots().length))}). À éviter (déjà prévus) : ${[cur,...others].filter(Boolean).join(' ; ')}.\nRéponds uniquement en JSON : {"plat":"...","detail":"...","ingredients":[{"n":"...","q":0,"u":"g","r":"...","p":0}]}`;
       m=cleanMeal(await sample.json(prompt,{modelTier:'quick'}),s)}catch(e){m=null}}
   if(!m)m=bankMeal(s,[cur,...others]);plan.meals[id]=m;savePlan();renderMenu();renderCourses()}
 
 /* ---------- événements ---------- */
 document.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(!b)return;tab=b.dataset.tab;try{localStorage.setItem('paf-tab',tab)}catch(x){}renderTabs()});
 $('#settings').addEventListener('change',e=>{const s=plan.settings,t=e.target;
-  if(t.id==='s-week'&&t.value)s.week=t.value;if(t.id==='s-shop')s.shop=+t.value;if(t.id==='s-budget')s.budget=Math.max(0,+t.value||0);
+  if(t.id==='s-start'&&t.value){const len=rangeDays().length;s.start=t.value;if(s.end<s.start)s.end=addD(s.start,Math.max(0,len-1));if(addD(s.start,MAXD-1)<s.end)s.end=addD(s.start,MAXD-1);if(s.shop<s.start||s.shop>s.end)s.shop=s.start}
+  if(t.id==='s-end'&&t.value){s.end=t.value<s.start?s.start:(t.value>addD(s.start,MAXD-1)?addD(s.start,MAXD-1):t.value);if(s.shop>s.end)s.shop=s.start}
+  if(t.id==='s-shop')s.shop=t.value;ensureSlots();if(t.id==='s-budget')s.budget=Math.max(0,+t.value||0);
   if(t.id==='s-store')s.store=t.value.trim().slice(0,40);if(t.id==='s-a')s.a=Math.max(0,Math.min(20,+t.value||0));if(t.id==='s-e')s.e=Math.max(0,Math.min(20,+t.value||0));
   savePlan();renderSettings();renderSlots();renderMenu();renderCourses()});
 $('#applyAll').addEventListener('click',()=>{Object.values(plan.slots).forEach(s=>{s.a=plan.settings.a;s.e=plan.settings.e});savePlan();renderSlots();renderMenu();renderCourses()});
@@ -356,7 +370,7 @@ $('#chips').innerHTML=QUICK.map(([n,r],i)=>`<button class="chip" data-qi="${i}">
 $('#chips').addEventListener('click',e=>{const b=e.target.closest('[data-qi]');if(b){const [n,r]=QUICK[+b.dataset.qi];addExtra(n,'',r)}});
 $('#uncheck').addEventListener('click',()=>{plan.checked={};extras.items.forEach(x=>x.done=false);savePlan();saveExtras();renderCourses()});
 $('#copy').addEventListener('click',async()=>{const items=aggregate().map(x=>({r:x.r,t:`${x.n} — ${fmtQ(x.q,x.u)}`,done:plan.checked[x.k]})).concat(extras.items.map(x=>({r:x.r,t:x.n+(x.q?' — '+x.q:''),done:x.done})));
-  const txt=`Courses PAF — ${DAYS[plan.settings.shop]} ${dayDate(plan.settings.shop)}${plan.settings.store?' · '+plan.settings.store:''}\n`+RAYONS.map(r=>{const its=items.filter(x=>x.r===r&&!x.done);return its.length?`\n${r}\n`+its.map(x=>'☐ '+x.t).join('\n'):''}).join('');
+  const txt=`Courses PAF — ${longD(plan.settings.shop)} (du ${dayDate(plan.settings.start)} au ${dayDate(plan.settings.end)})${plan.settings.store?' · '+plan.settings.store:''}\n`+RAYONS.map(r=>{const its=items.filter(x=>x.r===r&&!x.done);return its.length?`\n${r}\n`+its.map(x=>'☐ '+x.t).join('\n'):''}).join('');
   try{await navigator.clipboard.writeText(txt);$('#copy').textContent='Copiée ✓'}catch(e){$('#copy').textContent='Copie impossible'}setTimeout(()=>$('#copy').textContent='Copier la liste',2000)});
 document.addEventListener('focusout',()=>{if(pendingRemote){setTimeout(()=>{if(!document.activeElement||!document.activeElement.matches('input,select')){pendingRemote=false;render()}},50)}});
 
@@ -374,7 +388,7 @@ render();
   async function pull(){if(saving)return;const {data,error}=await sb.from('paf_docs').select('key,body,updated_at');
     if(error){setSync('Hors ligne — modifications gardées sur cet appareil');return}
     let changed=false;for(const r of data||[]){if(seen[r.key]===r.updated_at)continue;seen[r.key]=r.updated_at;const js=JSON.stringify(r.body);if(js===lastSent[r.key])continue;
-      if(r.key==='plan'&&r.body&&r.body.settings&&r.body.slots){plan={...defPlan(),...clone(r.body)};changed=true}
+      if(r.key==='plan'&&r.body&&r.body.settings&&r.body.slots){plan=normalize({...defPlan(),...clone(r.body)});changed=true}
       if(r.key==='extras'&&r.body){extras={items:Array.isArray(r.body.items)?clone(r.body.items):[]};changed=true}}
     setSync('Synchronisé ✓');if(!changed)return;cache();const a=document.activeElement;if(a&&a.matches('input,select')&&a.type!=='checkbox'){pendingRemote=true;return}render()}
   setSync('Connexion…');await pull();
