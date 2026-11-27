@@ -99,6 +99,7 @@ ul.list li.done .nm{text-decoration:line-through;color:var(--muted)}
 .star[aria-pressed=true]{color:#e0a100}
 .chip.fav{background:var(--butter)}
 .scanbar{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+.jl{display:flex;gap:10px;align-items:center;background:var(--bg);border-radius:14px;padding:8px 12px;min-height:44px;font-weight:700}.jl .q{margin-left:auto;white-space:nowrap}
 .code{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 @media(prefers-reduced-motion:reduce){.spin{animation:none}.meter i{transition:none}}
 .scroll{overflow-x:auto}
@@ -168,7 +169,7 @@ table{font-size:14px}.stack thead{display:none}.stack tr{display:grid;padding:8p
     <div class="card">
       <div class="row" style="justify-content:space-between">
         <div><h2>Liste de courses</h2><p class="hint" id="shopHint" style="margin:0"></p></div>
-        <div class="row"><button class="btn ghost" id="copy">Copier la liste</button><button class="btn ghost" id="uncheck">Tout décocher</button></div>
+        <div class="row"><button class="btn" type="button" id="jdrBtn">Ajouter JdR</button><button class="btn ghost" id="copy">Copier la liste</button><button class="btn ghost" id="uncheck">Tout décocher</button></div>
       </div>
       <div class="meter" style="margin-top:14px"><i id="progBar" style="width:0"></i></div>
       <div class="hint" id="progLbl"></div>
@@ -195,6 +196,12 @@ table{font-size:14px}.stack thead{display:none}.stack tr{display:grid;padding:8p
   <section id="p-budget" hidden><div class="soon"><div class="card"><h2>Budget complet — bientôt</h2><p>Cette partie suivra l'ensemble du budget familial :</p><ul><li>revenus et dépenses fixes du mois</li><li>enveloppes par poste (courses, maison, loisirs…)</li><li>dépenses réelles des courses comparées au budget visé des menus</li></ul></div></div></section>
   <section id="p-edt" hidden><div class="soon"><div class="card" style="background:var(--rose)"><h2>Emploi du temps — bientôt</h2><p>Cette partie regroupera l'organisation de la famille :</p><ul><li>planning de la semaine de chacun</li><li>activités des enfants, rendez-vous</li><li>lien avec les repas (soirs pressés → menus rapides)</li></ul></div></div></section>
 </div>
+
+<div class="modal" id="jdr" hidden role="dialog" aria-modal="true" aria-labelledby="jdrT"><div class="mcard">
+  <div class="row" style="justify-content:space-between;flex-wrap:nowrap"><h2 id="jdrT">Courses du week-end JdR</h2><button class="icon" type="button" id="jdrClose" aria-label="Fermer">✕</button></div>
+  <div class="row" style="flex-wrap:nowrap;margin:8px 0"><button class="icon" type="button" id="jdrPrev" aria-label="Week-end précédent">‹</button><b id="jdrWk" style="flex:1;text-align:center"></b><button class="icon" type="button" id="jdrNext" aria-label="Week-end suivant">›</button></div>
+  <div id="jdrBody"></div>
+</div></div>
 
 <div class="modal" id="scan" hidden role="dialog" aria-modal="true" aria-labelledby="scanT"><div class="mcard">
   <div class="row" style="justify-content:space-between;flex-wrap:nowrap"><h2 id="scanT">Scanner un produit</h2><button class="icon" type="button" id="scanClose" aria-label="Fermer">✕</button></div>
@@ -323,9 +330,10 @@ function renderMenu(){const sl=activeSlots(),has=sl.some(s=>plan.meals[s.id]);co
 const favOf=x=>favs.items.find(f=>(x.code&&f.code===x.code)||f.n.toLowerCase()===String(x.n).toLowerCase());
 function starBtn(x,attr){const on=!!favOf(x);return `<button class="star" type="button" ${attr} aria-pressed="${on}" aria-label="${on?'Retirer des':'Mettre en'} favoris : ${esc(x.n)}" title="Favori">${on?'★':'☆'}</button>`}
 function itemLi(key,name,q,meta,done,kind,del,pre){return `<li class="${done?'done':''}"><label><input type="checkbox" data-${kind}="${esc(key)}" ${done?'checked':''}><span><span class="nm">${esc(name)}</span><br><span class="q">${esc(q)}${meta?' · '+esc(meta):''}</span></span></label>${pre||''}${del?`<button class="icon" data-del="${esc(key)}" aria-label="Supprimer ${esc(name)}">✕</button>`:''}</li>`}
-function groups(items){return RAYONS.map(r=>{const its=items.filter(x=>x.r===r);if(!its.length)return '';return `<div class="group"><h3>${esc(r)} <span class="pill">${its.length}</span></h3><ul class="list">${its.map(x=>x.html).join('')}</ul></div>`}).join('')}
+const JDR='JdR du week-end';
+function groups(items){return [JDR,...RAYONS].map(r=>{const its=items.filter(x=>x.r===r);if(!its.length)return '';return `<div class="group"><h3>${esc(r)} <span class="pill">${its.length}</span></h3><ul class="list">${its.map(x=>x.html).join('')}</ul></div>`}).join('')}
 function menuItems(){return aggregate().sort((a,b)=>a.n.localeCompare(b.n,'fr')).map(x=>({r:x.r,done:!!plan.checked[x.k],html:itemLi(x.k,x.n,fmtQ(x.q,x.u)+' · ≈ '+eur(x.p),x.used.join(', '),!!plan.checked[x.k],'mk')}))}
-function extraItems(){return extras.items.map(x=>({r:RAYONS.includes(x.r)?x.r:'Autre',done:!!x.done,html:itemLi(x.id,x.n,x.q||'—','à part',!!x.done,'xk',true,starBtn(x,`data-star="${esc(x.id)}"`))}))}
+function extraItems(){return extras.items.map(x=>({r:x.src==='jdr'?JDR:RAYONS.includes(x.r)?x.r:'Autre',done:!!x.done,html:itemLi(x.id,x.n,x.q||'—',x.src==='jdr'?'JdR du '+dayDate(x.wk):'à part',!!x.done,'xk',true,starBtn(x,`data-star="${esc(x.id)}"`))}))}
 function favsHtml(){if(!favs.items.length)return '<div class="empty">Aucun favori. Touchez ☆ à côté d\'un article « À part », ou cochez « Garder dans mes favoris » après un scan.</div>';
   return `<div class="row" style="margin-bottom:10px"><button class="btn ghost" type="button" id="favAll">Tout ajouter à la liste</button></div>`+RAYONS.map(r=>{const its=favs.items.filter(f=>(RAYONS.includes(f.r)?f.r:'Autre')===r);if(!its.length)return '';
     return `<div class="group"><h3>${esc(r)} <span class="pill">${its.length}</span></h3><ul class="list">${its.map(f=>{const inList=extras.items.some(x=>!x.done&&((f.code&&x.code===f.code)||x.n.toLowerCase()===f.n.toLowerCase()));
@@ -404,6 +412,41 @@ $('#shopList').addEventListener('click',e=>{const st=e.target.closest('[data-sta
   if(e.target.closest('#favAll')){favs.items.forEach(f=>addExtra(f.n,f.q,f.r,f.code));return}
   const b=e.target.closest('[data-del]');if(!b)return;extras.items=extras.items.filter(x=>x.id!==b.dataset.del);saveExtras();renderCourses()});
 
+/* ---------- import des courses du week-end JdR (bilan MJ du site) ---------- */
+let jdrK=null,jdrData=null,jdrSeq=0;
+const isFri=d=>new Date(d+'T12:00:00').getDay()===5;
+function siteFriday(){const d=new Date();d.setHours(12,0,0,0);const off=(d.getDay()+2)%7;d.setDate(d.getDate()+(off<=2?-off:7-off));return iso(d)}
+function pickFriday(){return rangeDays().find(isFri)||siteFriday()}
+const jqty=c=>c.q!=null&&!c.sans_q?String(Math.ceil(c.q-1e-9))+(c.q%1?` (${String(Math.round(c.q*100)/100).replace('.',',')} nécessaires)`:''):`pour ${String(c.pour).replace('.',',')} portion${c.pour>1?'s':''}`;
+async function openJdr(){jdrK=pickFriday();$('#jdr').hidden=false;await loadJdr()}
+function closeJdr(){$('#jdr').hidden=true;jdrSeq++}
+async function loadJdr(){const seq=++jdrSeq,k=jdrK;$('#jdrWk').textContent=`Week-end du ${longD(k)} au ${longD(addD(k,2))}`;$('#jdrBody').innerHTML='<p class="note"><span class="spin"></span>Chargement des réservations…</p>';
+  if(!db){$('#jdrBody').innerHTML='<p class="note err">Connexion au site indisponible.</p>';return}
+  const {data,error}=await db.rpc('bilan_weekend',{p_vendredi:k});if(seq!==jdrSeq)return;
+  if(error||!data){jdrData=null;$('#jdrBody').innerHTML='<p class="note err">Impossible de charger le bilan de ce week-end.</p>';return}
+  jdrData=data;renderJdr()}
+function renderJdr(){const b=jdrData,k=jdrK,ses=Array.isArray(b.sessions)?b.sessions:[],pl=Array.isArray(b.plats)?b.plats:[],co=Array.isArray(b.courses)?b.courses:[];
+  const already=extras.items.filter(x=>x.src==='jdr'&&x.wk===k).length;const nOpt=pl.reduce((t,p)=>t+(+p.n_option||0),0);
+  const head=`<p class="hint" style="margin:0 0 10px">${ses.length} partie${ses.length>1?'s':''} ce week-end${pl.length?' · '+pl.map(p=>esc(p.plat)+' × '+esc(p.n)).join(', '):''}${nOpt?` · dont ${esc(nOpt)} en option (pas encore confirmé)`:''}</p>`;
+  if(!co.length){$('#jdrBody').innerHTML=head+'<div class="empty">Aucun repas commandé pour ce week-end : rien à acheter.</div>';return}
+  $('#jdrBody').innerHTML=head+`<div class="row" style="justify-content:space-between;margin-bottom:8px"><b>Ingrédients à acheter</b><button class="btn ghost favb" type="button" id="jdrAll">Tout décocher</button></div>
+    <div style="display:grid;gap:6px">${co.map((c,i)=>`<label class="jl"><input type="checkbox" data-ji="${i}" checked><span>${esc(c.label)}</span><span class="q">${esc(jqty(c))}</span></label>`).join('')}</div>
+    ${already?`<p class="note" style="margin-top:10px">Ce week-end est déjà dans la liste (${already} article${already>1?'s':''}) : l'import le remettra à jour, les articles déjà cochés restent cochés.</p>`:''}
+    <div class="row" style="margin-top:12px"><button class="btn main" type="button" id="jdrImport">${already?'Mettre à jour la liste':'Importer dans la liste'}</button></div>`}
+function importJdr(){const co=jdrData&&Array.isArray(jdrData.courses)?jdrData.courses:[],k=jdrK;
+  const sel=[...document.querySelectorAll('#jdrBody [data-ji]')].filter(c=>c.checked).map(c=>co[+c.dataset.ji]).filter(Boolean);
+  const old=extras.items.filter(x=>x.src==='jdr'&&x.wk===k),wasDone=new Set(old.filter(x=>x.done).map(x=>x.n.toLowerCase()));
+  extras.items=extras.items.filter(x=>!(x.src==='jdr'&&x.wk===k));
+  sel.forEach(c=>{const n=String(c.label||'').trim().slice(0,60);if(n)extras.items.push({id:uid(),n,q:jqty(c).slice(0,40),r:'Autre',src:'jdr',wk:k,done:wasDone.has(n.toLowerCase())})});
+  saveExtras();sub='extras';renderCourses();closeJdr()}
+$('#jdrBtn').addEventListener('click',openJdr);
+$('#jdrClose').addEventListener('click',closeJdr);
+$('#jdr').addEventListener('click',e=>{if(e.target.id==='jdr')closeJdr();if(e.target.id==='jdrImport')importJdr();
+  if(e.target.id==='jdrAll'){const cbs=[...document.querySelectorAll('#jdrBody [data-ji]')],on=!cbs.every(c=>c.checked);cbs.forEach(c=>c.checked=on);e.target.textContent=on?'Tout décocher':'Tout cocher'}});
+$('#jdrPrev').addEventListener('click',()=>{jdrK=addD(jdrK,-7);loadJdr()});
+$('#jdrNext').addEventListener('click',()=>{jdrK=addD(jdrK,7);loadJdr()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#jdr').hidden)closeJdr()});
+
 /* ---------- scan de code-barres ---------- */
 let scanner=null,handling=false,scanCode='';
 const smsg=t=>{$('#scanMsg').textContent=t};
@@ -449,8 +492,8 @@ $('#addForm').addEventListener('submit',e=>{e.preventDefault();addExtra($('#x-n'
 function renderChips(){$('#chips').innerHTML=favs.items.map(f=>`<button class="chip fav" type="button" data-fq="${esc(f.id)}">★ ${esc(f.n)}</button>`).join('')+QUICK.filter(([n])=>!favs.items.some(f=>f.n.toLowerCase()===n.toLowerCase())).map(([n])=>`<button class="chip" type="button" data-qi="${esc(n)}">+ ${esc(n)}</button>`).join('')}
 $('#chips').addEventListener('click',e=>{const b=e.target.closest('[data-qi],[data-fq]');if(!b)return;if(b.dataset.fq){const f=favs.items.find(x=>x.id===b.dataset.fq);if(f)addExtra(f.n,f.q,f.r,f.code);return}const q=QUICK.find(([n])=>n===b.dataset.qi);if(q)addExtra(q[0],'',q[1])});
 $('#uncheck').addEventListener('click',()=>{plan.checked={};extras.items.forEach(x=>x.done=false);savePlan();saveExtras();renderCourses()});
-$('#copy').addEventListener('click',async()=>{const items=aggregate().map(x=>({r:x.r,t:`${x.n} — ${fmtQ(x.q,x.u)}`,done:plan.checked[x.k]})).concat(extras.items.map(x=>({r:x.r,t:x.n+(x.q?' — '+x.q:''),done:x.done})));
-  const txt=`Courses PAF — ${longD(plan.settings.shop)} (du ${dayDate(plan.settings.start)} au ${dayDate(plan.settings.end)})${plan.settings.store?' · '+plan.settings.store:''}\n`+RAYONS.map(r=>{const its=items.filter(x=>x.r===r&&!x.done);return its.length?`\n${r}\n`+its.map(x=>'☐ '+x.t).join('\n'):''}).join('');
+$('#copy').addEventListener('click',async()=>{const items=aggregate().map(x=>({r:x.r,t:`${x.n} — ${fmtQ(x.q,x.u)}`,done:plan.checked[x.k]})).concat(extras.items.map(x=>({r:x.src==='jdr'?JDR:x.r,t:x.n+(x.q?' — '+x.q:''),done:x.done})));
+  const txt=`Courses PAF — ${longD(plan.settings.shop)} (du ${dayDate(plan.settings.start)} au ${dayDate(plan.settings.end)})${plan.settings.store?' · '+plan.settings.store:''}\n`+[JDR,...RAYONS].map(r=>{const its=items.filter(x=>x.r===r&&!x.done);return its.length?`\n${r}\n`+its.map(x=>'☐ '+x.t).join('\n'):''}).join('');
   try{await navigator.clipboard.writeText(txt);$('#copy').textContent='Copiée ✓'}catch(e){$('#copy').textContent='Copie impossible'}setTimeout(()=>$('#copy').textContent='Copier la liste',2000)});
 document.addEventListener('focusout',()=>{if(pendingRemote){setTimeout(()=>{if(!document.activeElement||!document.activeElement.matches('input,select')){pendingRemote=false;render()}},50)}});
 
